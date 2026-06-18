@@ -1,11 +1,5 @@
 import { redirect } from "next/navigation";
-import { buildProgrammeRoute, getStaticProgrammeParams } from "@/lib/programme";
-
-export const dynamicParams = false;
-
-export function generateStaticParams() {
-  return getStaticProgrammeParams();
-}
+import { buildProgrammeRoute } from "@/lib/programme";
 
 export default async function ProgrammeIndexPage({
   params,

@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import { AppDataProvider } from "@/lib/app-data";
 
 export const metadata: Metadata = {
   title: "UNESCO AI Competency Explorer",
@@ -14,7 +15,9 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className="h-full antialiased">
-      <body className="min-h-full">{children}</body>
+      <body className="min-h-full">
+        <AppDataProvider>{children}</AppDataProvider>
+      </body>
     </html>
   );
 }

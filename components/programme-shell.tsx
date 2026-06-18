@@ -1,8 +1,11 @@
+"use client";
+
 import { ReactNode } from "react";
 import Link from "next/link";
 import { PageShell } from "@/components/page-shell";
 import { ProgrammeTabs } from "@/components/programme-tabs";
 import { formatProgrammeName } from "@/lib/programme";
+import { useAppData } from "@/lib/app-data";
 
 type ProgrammeShellProps = {
   programmeId: string;
@@ -10,21 +13,19 @@ type ProgrammeShellProps = {
 };
 
 export function ProgrammeShell({ programmeId, children }: ProgrammeShellProps) {
-  const programmeName = formatProgrammeName(programmeId);
+  const { state, isOffline } = useAppData();
+  const programme = state.programmes.find((record) => record.id === programmeId);
+  const programmeName = programme?.name ?? formatProgrammeName(programmeId);
 
   return (
     <PageShell>
       <div className="flex flex-col gap-6 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div className="space-y-2">
-            <p className="text-sm font-medium uppercase tracking-[0.2em] text-blue-600">
-              Programme workspace
-            </p>
+            <p className="text-sm font-medium uppercase tracking-[0.2em] text-blue-600">Programme workspace</p>
             <div>
               <h1 className="text-3xl font-semibold text-slate-900">{programmeName}</h1>
-              <p className="text-sm text-slate-600">
-                Starter shell for the UNESCO AI competency planning workflow.
-              </p>
+              <p className="text-sm text-slate-600">Design, map, and assess AI literacy outcomes.</p>
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-3 text-sm">
@@ -34,11 +35,19 @@ export function ProgrammeShell({ programmeId, children }: ProgrammeShellProps) {
             >
               All programmes
             </Link>
+            <span className="rounded-full bg-slate-100 px-4 py-2 font-medium text-slate-700">
+              {programme?.role ?? "owner"}
+            </span>
             <span className="rounded-full bg-emerald-50 px-4 py-2 font-medium text-emerald-700">
-              Synced
+              {isOffline ? "Offline" : "Synced"}
             </span>
           </div>
         </div>
+        {programme?.role === "viewer" ? (
+          <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+            You have view-only access to this programme.
+          </div>
+        ) : null}
         <ProgrammeTabs programmeId={programmeId} />
       </div>
       {children}
