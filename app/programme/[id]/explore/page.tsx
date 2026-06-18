@@ -1,7 +1,9 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
+import { useParams } from "next/navigation";
 import { findDimension, frameworkCompetencies, frameworkDimensions } from "@/lib/framework";
+import { usePersistentState } from "@/lib/persistent-state";
 
 const references = [
   {
@@ -26,11 +28,23 @@ const references = [
 type Level = "understand" | "apply" | "create";
 
 export default function ExplorePage() {
-  const [search, setSearch] = useState("");
-  const [selectedDimension, setSelectedDimension] = useState(frameworkDimensions[0].id);
-  const [selectedCompetencyId, setSelectedCompetencyId] = useState(frameworkCompetencies[0].id);
-  const [selectedLevel, setSelectedLevel] = useState<Level>("understand");
-  const [showGrid, setShowGrid] = useState(false);
+  const params = useParams<{ id: string }>();
+  const programmeId =
+    typeof window !== "undefined"
+      ? new URLSearchParams(window.location.search).get("programme") ?? params.id
+      : params.id;
+  const stateKey = `ai-literacy-planner:explore:${programmeId}`;
+  const [search, setSearch] = usePersistentState(`${stateKey}:search`, "");
+  const [selectedDimension, setSelectedDimension] = usePersistentState(
+    `${stateKey}:dimension`,
+    frameworkDimensions[0].id,
+  );
+  const [selectedCompetencyId, setSelectedCompetencyId] = usePersistentState(
+    `${stateKey}:competency`,
+    frameworkCompetencies[0].id,
+  );
+  const [selectedLevel, setSelectedLevel] = usePersistentState<Level>(`${stateKey}:level`, "understand");
+  const [showGrid, setShowGrid] = usePersistentState(`${stateKey}:grid`, false);
 
   const filteredCompetencies = useMemo(() => {
     const query = search.trim().toLowerCase();

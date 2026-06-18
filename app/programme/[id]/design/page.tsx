@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { useParams } from "next/navigation";
 import { frameworkCompetencies, findDimension } from "@/lib/framework";
 import { useAppData } from "@/lib/app-data";
+import { usePersistentState } from "@/lib/persistent-state";
 
 export default function DesignPage() {
   const params = useParams<{ id: string }>();
@@ -12,11 +13,16 @@ export default function DesignPage() {
       ? new URLSearchParams(window.location.search).get("programme") ?? params.id
       : params.id;
   const { state, addLearningOutcome, updateLearningOutcome, deleteLearningOutcome } = useAppData();
-  const [selectedCompetencyId, setSelectedCompetencyId] = useState(frameworkCompetencies[0].id);
+  const [selectedCompetencyId, setSelectedCompetencyId] = usePersistentState(
+    `ai-literacy-planner:design:${programmeId}:competency`,
+    frameworkCompetencies[0].id,
+  );
   const [draft, setDraft] = useState("");
 
 
   const learningOutcomes = state.learningOutcomes.filter((learningOutcome) => learningOutcome.programmeId === programmeId);
+  const programme = state.programmes.find((record) => record.id === programmeId);
+  const isViewer = programme?.role === "viewer";
   const coveredCompetencies = new Set(
     learningOutcomes.filter((learningOutcome) => learningOutcome.competencyId).map((learningOutcome) => learningOutcome.competencyId),
   );
@@ -52,35 +58,47 @@ export default function DesignPage() {
       <div className="grid gap-6 lg:grid-cols-[320px_minmax(0,1fr)]">
         <section className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm">
           <h3 className="text-sm font-semibold uppercase tracking-[0.2em] text-slate-500">Competencies</h3>
-          <div className="mt-3 space-y-2">
-            {frameworkCompetencies.map((competency) => {
-              const count = learningOutcomes.filter((learningOutcome) => learningOutcome.competencyId === competency.id).length;
-              const dimension = findDimension(competency.dimensionId);
+          <div className="mt-3 space-y-4">
+            {Array.from(new Set(frameworkCompetencies.map((competency) => competency.dimensionId))).map((dimensionId) => {
+              const dimension = findDimension(dimensionId);
+              const dimensionCompetencies = frameworkCompetencies.filter(
+                (competency) => competency.dimensionId === dimensionId,
+              );
 
               return (
-                <button
-                  key={competency.id}
-                  type="button"
-                  className={`w-full rounded-xl border px-3 py-3 text-left ${
-                    selectedCompetencyId === competency.id
-                      ? "border-blue-500 bg-blue-50"
-                      : "border-slate-200 bg-white hover:border-slate-300"
-                  }`}
-                  onClick={() => setSelectedCompetencyId(competency.id)}
-                >
-                  <div className="flex items-start justify-between gap-2">
-                    <div>
-                      <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{competency.id}</p>
-                      <p className="text-sm font-semibold text-slate-900">{competency.title}</p>
-                    </div>
-                    <span className="rounded-full bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-600">
-                      {count} LOs
-                    </span>
-                  </div>
-                  <span className={`mt-2 inline-block rounded-full px-2 py-1 text-xs font-semibold ${dimension?.colorClass}`}>
+                <section key={dimensionId} className="space-y-2">
+                  <h4 className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
                     {dimension?.label}
-                  </span>
-                </button>
+                  </h4>
+                  {dimensionCompetencies.map((competency) => {
+                    const count = learningOutcomes.filter(
+                      (learningOutcome) => learningOutcome.competencyId === competency.id,
+                    ).length;
+
+                    return (
+                      <button
+                        key={competency.id}
+                        type="button"
+                        className={`w-full rounded-xl border px-3 py-3 text-left ${
+                          selectedCompetencyId === competency.id
+                            ? "border-blue-500 bg-blue-50"
+                            : "border-slate-200 bg-white hover:border-slate-300"
+                        }`}
+                        onClick={() => setSelectedCompetencyId(competency.id)}
+                      >
+                        <div className="flex items-start justify-between gap-2">
+                          <div>
+                            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{competency.id}</p>
+                            <p className="text-sm font-semibold text-slate-900">{competency.title}</p>
+                          </div>
+                          <span className="rounded-full bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-600">
+                            {count} LOs
+                          </span>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </section>
               );
             })}
           </div>
@@ -92,14 +110,58 @@ export default function DesignPage() {
                 <p className="text-xs text-slate-500">None</p>
               ) : (
                 unassignedOutcomes.map((learningOutcome) => (
-                  <button
+                  <article
                     key={learningOutcome.id}
-                    type="button"
-                    className="w-full rounded-lg border border-slate-200 bg-white px-2 py-2 text-left text-xs text-slate-700"
-                    onClick={() => setSelectedCompetencyId(frameworkCompetencies[0].id)}
+                    className="rounded-lg border border-slate-200 bg-white px-3 py-3 text-xs text-slate-700"
                   >
-                    {learningOutcome.text}
-                  </button>
+                    <div className="flex flex-wrap gap-2">
+                      {learningOutcome.category ? (
+                        <span className="rounded-full bg-slate-100 px-2 py-1 font-semibold text-slate-600">
+                          {learningOutcome.category}
+                        </span>
+                      ) : null}
+                      {learningOutcome.loNumber ? (
+                        <span className="rounded-full bg-slate-100 px-2 py-1 font-semibold text-slate-600">
+                          LO {learningOutcome.loNumber}
+                        </span>
+                      ) : null}
+                    </div>
+                    <p className="mt-2 leading-5">{learningOutcome.text}</p>
+                    {!isViewer ? (
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        <button
+                          type="button"
+                          className="rounded-full bg-blue-600 px-3 py-1 font-semibold text-white hover:bg-blue-700"
+                          onClick={() =>
+                            updateLearningOutcome(learningOutcome.id, {
+                              competencyId: selectedCompetencyId,
+                            })
+                          }
+                        >
+                          Assign to {selectedCompetencyId}
+                        </button>
+                        <button
+                          type="button"
+                          className="rounded-full border border-slate-300 px-3 py-1 font-semibold text-slate-700"
+                          onClick={() => {
+                            const nextText = window.prompt("Edit imported LO", learningOutcome.text);
+                            if (nextText && nextText.trim().length >= 10) {
+                              updateLearningOutcome(learningOutcome.id, { text: nextText.trim() });
+                            }
+                          }}
+                        >
+                          Edit
+                        </button>
+                        <button
+                          type="button"
+                          className="rounded-full border border-red-200 px-3 py-1 font-semibold text-red-700"
+                          onClick={() => deleteLearningOutcome(learningOutcome.id)}
+                        >
+                          Delete
+                        </button>
+                      </div>
+                    ) : null}
+                  </article>
                 ))
               )}
             </div>
@@ -123,71 +185,79 @@ export default function DesignPage() {
               competencyOutcomes.map((learningOutcome) => (
                 <article key={learningOutcome.id} className="rounded-xl border border-slate-200 p-4">
                   <p className="text-sm leading-6 text-slate-700">{learningOutcome.text}</p>
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    <button
-                      type="button"
-                      className="rounded-full border border-slate-300 px-3 py-1 text-xs font-semibold text-slate-700"
-                      onClick={() => {
-                        const nextText = window.prompt("Edit LO", learningOutcome.text);
-                        if (nextText && nextText.trim().length >= 10) {
-                          updateLearningOutcome(learningOutcome.id, { text: nextText.trim() });
+                  {!isViewer ? (
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        className="rounded-full border border-slate-300 px-3 py-1 text-xs font-semibold text-slate-700"
+                        onClick={() => {
+                          const nextText = window.prompt("Edit LO", learningOutcome.text);
+                          if (nextText && nextText.trim().length >= 10) {
+                            updateLearningOutcome(learningOutcome.id, { text: nextText.trim() });
+                          }
+                        }}
+                      >
+                        Edit
+                      </button>
+                      <button
+                        type="button"
+                        className="rounded-full border border-slate-300 px-3 py-1 text-xs font-semibold text-slate-700"
+                        onClick={() =>
+                          updateLearningOutcome(learningOutcome.id, {
+                            competencyId: null,
+                          })
                         }
-                      }}
-                    >
-                      Edit
-                    </button>
-                    <button
-                      type="button"
-                      className="rounded-full border border-slate-300 px-3 py-1 text-xs font-semibold text-slate-700"
-                      onClick={() =>
-                        updateLearningOutcome(learningOutcome.id, {
-                          competencyId: null,
-                        })
-                      }
-                    >
-                      Unassign
-                    </button>
-                    <button
-                      type="button"
-                      className="rounded-full border border-red-200 px-3 py-1 text-xs font-semibold text-red-700"
-                      onClick={() => deleteLearningOutcome(learningOutcome.id)}
-                    >
-                      Delete
-                    </button>
-                  </div>
+                      >
+                        Unassign
+                      </button>
+                      <button
+                        type="button"
+                        className="rounded-full border border-red-200 px-3 py-1 text-xs font-semibold text-red-700"
+                        onClick={() => deleteLearningOutcome(learningOutcome.id)}
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  ) : null}
                 </article>
               ))
             )}
           </div>
 
-          <form
-            className="mt-6 space-y-3 rounded-xl bg-slate-50 p-4"
-            onSubmit={(event) => {
-              event.preventDefault();
-              if (draft.trim().length < 10) {
-                return;
-              }
+          {!isViewer ? (
+            <form
+              className="mt-6 space-y-3 rounded-xl bg-slate-50 p-4"
+              onSubmit={(event) => {
+                event.preventDefault();
+                if (draft.trim().length < 10) {
+                  return;
+                }
 
-              addLearningOutcome(programmeId, {
-                competencyId: selectedCompetencyId,
-                text: draft.trim(),
-              });
-              setDraft("");
-            }}
-          >
-            <label className="text-sm font-semibold text-slate-700">Add Learning Outcome</label>
-            <textarea
-              className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm"
-              rows={3}
-              minLength={10}
-              value={draft}
-              onChange={(event) => setDraft(event.target.value)}
-              placeholder="Write a measurable programme learning outcome (minimum 10 characters)."
-            />
-            <button className="rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700" type="submit">
-              Save LO
-            </button>
-          </form>
+                addLearningOutcome(programmeId, {
+                  competencyId: selectedCompetencyId,
+                  text: draft.trim(),
+                });
+                setDraft("");
+              }}
+            >
+              <label className="text-sm font-semibold text-slate-700">Add Learning Outcome</label>
+              <textarea
+                className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm"
+                rows={3}
+                minLength={10}
+                value={draft}
+                onChange={(event) => setDraft(event.target.value)}
+                placeholder="Write a measurable programme learning outcome (minimum 10 characters)."
+              />
+              <button className="rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700" type="submit">
+                Save LO
+              </button>
+            </form>
+          ) : (
+            <p className="mt-6 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+              Viewer access is read-only. Learning outcomes can be reviewed but not edited.
+            </p>
+          )}
         </section>
       </div>
     </div>

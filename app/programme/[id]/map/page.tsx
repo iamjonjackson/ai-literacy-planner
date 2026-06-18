@@ -29,6 +29,8 @@ export default function MapPage() {
   const modules = state.modules
     .filter((module) => module.programmeId === programmeId)
     .sort((a, b) => a.year - b.year || a.order - b.order);
+  const programme = state.programmes.find((record) => record.id === programmeId);
+  const isViewer = programme?.role === "viewer";
   const learningOutcomes = state.learningOutcomes.filter((learningOutcome) => learningOutcome.programmeId === programmeId);
 
   const mapped = learningOutcomes.filter((learningOutcome) => learningOutcome.moduleId).length;
@@ -115,20 +117,24 @@ export default function MapPage() {
           <p className="text-sm text-slate-600">
             {modules.length} module{modules.length !== 1 ? "s" : ""} in this programme
           </p>
-          <button
-            type="button"
-            className="rounded-xl border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 hover:border-slate-400"
-            onClick={() => csvInputRef.current?.click()}
-          >
-            Import from CSV
-          </button>
-          <input
-            ref={csvInputRef}
-            type="file"
-            accept=".csv,text/csv"
-            className="hidden"
-            onChange={handleCsvFile}
-          />
+          {!isViewer ? (
+            <>
+              <button
+                type="button"
+                className="rounded-xl border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 hover:border-slate-400"
+                onClick={() => csvInputRef.current?.click()}
+              >
+                Import from CSV
+              </button>
+              <input
+                ref={csvInputRef}
+                type="file"
+                accept=".csv,text/csv"
+                className="hidden"
+                onChange={handleCsvFile}
+              />
+            </>
+          ) : null}
         </div>
 
         {parseError && (
@@ -244,6 +250,7 @@ export default function MapPage() {
                     <select
                       className="flex-1 rounded-lg border border-slate-200 px-2 py-1 text-xs"
                       value={learningOutcome.moduleId ?? ""}
+                      disabled={isViewer}
                       onChange={(event) => {
                         updateLearningOutcome(learningOutcome.id, {
                           moduleId: event.target.value || null,
@@ -257,13 +264,15 @@ export default function MapPage() {
                         </option>
                       ))}
                     </select>
-                    <button
-                      className="rounded-lg border border-slate-300 px-2 py-1 text-xs font-semibold text-slate-700"
-                      onClick={() => updateLearningOutcome(learningOutcome.id, { moduleId: null })}
-                      type="button"
-                    >
-                      Clear
-                    </button>
+                    {!isViewer ? (
+                      <button
+                        className="rounded-lg border border-slate-300 px-2 py-1 text-xs font-semibold text-slate-700"
+                        onClick={() => updateLearningOutcome(learningOutcome.id, { moduleId: null })}
+                        type="button"
+                      >
+                        Clear
+                      </button>
+                    ) : null}
                   </div>
                 </article>
               );
@@ -367,4 +376,3 @@ function CsvPreviewPanel({
     </div>
   );
 }
-

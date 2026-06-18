@@ -87,6 +87,22 @@ type BackupPayload = {
   assessments: Assessment[];
 };
 
+type ModuleDeletionImpact = {
+  moduleId: string;
+  programmeId: string;
+  moduleName: string;
+  mappedLearningOutcomeCount: number;
+  assessmentCount: number;
+  ratedAssessmentCount: number;
+  canDelete: boolean;
+};
+
+type BulkModuleDeletionResult = {
+  deletedCount: number;
+  skippedCount: number;
+  skippedModules: string[];
+};
+
 type AppDataState = {
   programmes: Programme[];
   modules: Module[];
@@ -102,8 +118,11 @@ type AppDataContextValue = {
   updateProgrammeYears: (programmeId: string, years: number) => void;
   deleteProgramme: (programmeId: string) => void;
   addModule: (programmeId: string, input: { year: number; name: string; code?: string }) => string;
+  getModuleDeletionImpact: (moduleId: string) => ModuleDeletionImpact | null;
+  clearModulesForYear: (programmeId: string, year: number) => BulkModuleDeletionResult;
+  resetProgrammeModules: (programmeId: string) => BulkModuleDeletionResult;
   updateModule: (moduleId: string, patch: Partial<Pick<Module, "name" | "code" | "credits" | "description" | "year" | "aims" | "scheme" | "organiser" | "url" | "isCompulsory">>) => void;
-  deleteModule: (moduleId: string) => void;
+  deleteModule: (moduleId: string) => ModuleDeletionImpact | null;
   addLearningOutcome: (programmeId: string, input: { competencyId: string | null; text: string }) => string;
   updateLearningOutcome: (
     learningOutcomeId: string,
@@ -189,6 +208,78 @@ function touchProgramme(programmes: Programme[], programmeId: string) {
   );
 }
 
+function getModuleDeletionImpactFromState(
+  state: AppDataState,
+  moduleId: string,
+): ModuleDeletionImpact | null {
+  const module = state.modules.find((record) => record.id === moduleId);
+  if (!module) {
+    return null;
+  }
+
+  const moduleAssessments = state.assessments.filter((assessment) => assessment.moduleId === moduleId);
+  const ratedAssessmentCount = moduleAssessments.filter(
+    (assessment) => assessment.rag !== null || assessment.priority !== null,
+  ).length;
+
+  return {
+    moduleId,
+    programmeId: module.programmeId,
+    moduleName: module.name,
+    mappedLearningOutcomeCount: state.learningOutcomes.filter((learningOutcome) => learningOutcome.moduleId === moduleId)
+      .length,
+    assessmentCount: moduleAssessments.length,
+    ratedAssessmentCount,
+    canDelete: ratedAssessmentCount === 0,
+  };
+}
+
+function deleteModulesFromState(
+  state: AppDataState,
+  moduleIds: string[],
+): { nextState: AppDataState; result: BulkModuleDeletionResult } {
+  const impacts = moduleIds
+    .map((moduleId) => getModuleDeletionImpactFromState(state, moduleId))
+    .filter((impact): impact is ModuleDeletionImpact => Boolean(impact));
+  const deletableIds = new Set(impacts.filter((impact) => impact.canDelete).map((impact) => impact.moduleId));
+
+  if (deletableIds.size === 0) {
+    return {
+      nextState: state,
+      result: {
+        deletedCount: 0,
+        skippedCount: impacts.length,
+        skippedModules: impacts.filter((impact) => !impact.canDelete).map((impact) => impact.moduleName),
+      },
+    };
+  }
+
+  const touchedProgrammeIds = new Set(
+    impacts.filter((impact) => deletableIds.has(impact.moduleId)).map((impact) => impact.programmeId),
+  );
+  const timestamp = new Date().toISOString();
+
+  return {
+    nextState: {
+      programmes: state.programmes.map((programme) =>
+        touchedProgrammeIds.has(programme.id) ? { ...programme, updatedAt: timestamp } : programme,
+      ),
+      modules: state.modules.filter((module) => !deletableIds.has(module.id)),
+      learningOutcomes: state.learningOutcomes.map((learningOutcome) =>
+        learningOutcome.moduleId && deletableIds.has(learningOutcome.moduleId)
+          ? { ...learningOutcome, moduleId: null }
+          : learningOutcome,
+      ),
+      assessments: state.assessments.filter((assessment) => !deletableIds.has(assessment.moduleId)),
+    },
+    result: {
+      deletedCount: deletableIds.size,
+      skippedCount: impacts.length - deletableIds.size,
+      skippedModules: impacts.filter((impact) => !impact.canDelete).map((impact) => impact.moduleName),
+    },
+  };
+}
+
 export function AppDataProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<AppDataState>(loadInitialState);
   const [isOffline, setIsOffline] = useState(false);
@@ -272,6 +363,49 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
     }));
   }, []);
 
+  const getModuleDeletionImpact = useCallback(
+    (moduleId: string) => getModuleDeletionImpactFromState(state, moduleId),
+    [state],
+  );
+
+  const clearModulesForYear = useCallback((programmeId: string, year: number) => {
+    let result: BulkModuleDeletionResult = {
+      deletedCount: 0,
+      skippedCount: 0,
+      skippedModules: [],
+    };
+
+    setState((current) => {
+      const moduleIds = current.modules
+        .filter((module) => module.programmeId === programmeId && module.year === year)
+        .map((module) => module.id);
+      const deletion = deleteModulesFromState(current, moduleIds);
+      result = deletion.result;
+      return deletion.nextState;
+    });
+
+    return result;
+  }, []);
+
+  const resetProgrammeModules = useCallback((programmeId: string) => {
+    let result: BulkModuleDeletionResult = {
+      deletedCount: 0,
+      skippedCount: 0,
+      skippedModules: [],
+    };
+
+    setState((current) => {
+      const moduleIds = current.modules
+        .filter((module) => module.programmeId === programmeId)
+        .map((module) => module.id);
+      const deletion = deleteModulesFromState(current, moduleIds);
+      result = deletion.result;
+      return deletion.nextState;
+    });
+
+    return result;
+  }, []);
+
   const addModule = useCallback(
     (programmeId: string, input: { year: number; name: string; code?: string }) => {
       const moduleId = generateId();
@@ -324,22 +458,18 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
   );
 
   const deleteModule = useCallback((moduleId: string) => {
+    let impact: ModuleDeletionImpact | null = null;
+
     setState((current) => {
-      const target = current.modules.find((module) => module.id === moduleId);
-      if (!target) {
+      impact = getModuleDeletionImpactFromState(current, moduleId);
+      if (!impact?.canDelete) {
         return current;
       }
 
-      return {
-        ...current,
-        programmes: touchProgramme(current.programmes, target.programmeId),
-        modules: current.modules.filter((module) => module.id !== moduleId),
-        learningOutcomes: current.learningOutcomes.map((learningOutcome) =>
-          learningOutcome.moduleId === moduleId ? { ...learningOutcome, moduleId: null } : learningOutcome,
-        ),
-        assessments: current.assessments.filter((assessment) => assessment.moduleId !== moduleId),
-      };
+      return deleteModulesFromState(current, [moduleId]).nextState;
     });
+
+    return impact;
   }, []);
 
   const addLearningOutcome = useCallback(
@@ -670,6 +800,9 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
       renameProgramme,
       updateProgrammeYears,
       deleteProgramme,
+      getModuleDeletionImpact,
+      clearModulesForYear,
+      resetProgrammeModules,
       addModule,
       updateModule,
       deleteModule,
@@ -690,6 +823,9 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
       renameProgramme,
       updateProgrammeYears,
       deleteProgramme,
+      getModuleDeletionImpact,
+      clearModulesForYear,
+      resetProgrammeModules,
       addModule,
       updateModule,
       deleteModule,
@@ -717,4 +853,15 @@ export function useAppData() {
   return context;
 }
 
-export type { Programme, Module, LearningOutcome, Assessment, BackupPayload, PriorityRating, RagStatus, CsvModuleImportRow };
+export type {
+  Programme,
+  Module,
+  LearningOutcome,
+  Assessment,
+  BackupPayload,
+  PriorityRating,
+  RagStatus,
+  CsvModuleImportRow,
+  ModuleDeletionImpact,
+  BulkModuleDeletionResult,
+};

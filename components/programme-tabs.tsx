@@ -2,7 +2,9 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { frameworkCompetencies } from "@/lib/framework";
 import { buildProgrammeRoute, demoProgrammeId, programmeTabs } from "@/lib/programme";
+import { useAppData } from "@/lib/app-data";
 
 type ProgrammeTabsProps = {
   programmeId: string;
@@ -10,6 +12,13 @@ type ProgrammeTabsProps = {
 
 export function ProgrammeTabs({ programmeId }: ProgrammeTabsProps) {
   const pathname = usePathname();
+  const { state } = useAppData();
+  const coveredCompetencies = new Set(
+    state.learningOutcomes
+      .filter((learningOutcome) => learningOutcome.programmeId === programmeId && learningOutcome.competencyId)
+      .map((learningOutcome) => learningOutcome.competencyId),
+  );
+  const designIncomplete = coveredCompetencies.size < frameworkCompetencies.length;
 
   return (
     <nav aria-label="Programme tabs" className="flex flex-wrap gap-2">
@@ -28,7 +37,18 @@ export function ProgrammeTabs({ programmeId }: ProgrammeTabsProps) {
                 : "border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:text-slate-900"
             }`}
           >
-            {tab.label}
+            <span className="inline-flex items-center gap-2">
+              <span>{tab.label}</span>
+              {tab.slug === "design" && designIncomplete && !isActive ? (
+                <span
+                  aria-label="Design tab incomplete"
+                  className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-amber-100 px-1.5 text-[10px] font-semibold text-amber-700"
+                  title="Some competencies still have no learning outcomes."
+                >
+                  !
+                </span>
+              ) : null}
+            </span>
           </Link>
         );
       })}

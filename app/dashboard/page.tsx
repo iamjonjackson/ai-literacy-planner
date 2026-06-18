@@ -156,6 +156,9 @@ export default function DashboardPage() {
                 <div>
                   <h2 className="text-xl font-semibold text-slate-900">{programme.name}</h2>
                   <p className="mt-2 text-sm leading-6 text-slate-600">{programme.description || "No description yet."}</p>
+                  {programme.role !== "owner" ? (
+                    <p className="mt-2 text-xs text-slate-500">Owner: {programme.ownerEmail}</p>
+                  ) : null}
                   <p className="mt-2 text-xs text-slate-500">Updated {formatDate(programme.updatedAt)}</p>
                 </div>
                 <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-slate-600">
@@ -183,36 +186,48 @@ export default function DashboardPage() {
                 >
                   Open
                 </Link>
-                <button
-                  className="rounded-full border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700"
-                  onClick={() => {
-                    const nextName = window.prompt("Rename programme", programme.name);
-                    if (nextName?.trim()) {
-                      renameProgramme(programme.id, nextName.trim());
-                    }
-                  }}
-                  type="button"
-                >
-                  Rename
-                </button>
-                <button
-                  className="rounded-full border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700"
-                  onClick={() => handleExport(programme.id)}
-                  type="button"
-                >
-                  Export JSON
-                </button>
-                <button
-                  className="rounded-full border border-red-200 px-4 py-2 text-sm font-semibold text-red-700"
-                  onClick={() => {
-                    if (window.confirm("Delete this programme and all related data?")) {
-                      deleteProgramme(programme.id);
-                    }
-                  }}
-                  type="button"
-                >
-                  Delete
-                </button>
+                {programme.role === "owner" ? (
+                  <>
+                    <button
+                      className="rounded-full border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700"
+                      onClick={() => {
+                        const nextName = window.prompt("Rename programme", programme.name);
+                        if (nextName?.trim()) {
+                          renameProgramme(programme.id, nextName.trim());
+                        }
+                      }}
+                      type="button"
+                    >
+                      Rename
+                    </button>
+                    <button
+                      className="rounded-full border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700"
+                      onClick={() => handleExport(programme.id)}
+                      type="button"
+                    >
+                      Export JSON
+                    </button>
+                    <button
+                      className="rounded-full border border-red-200 px-4 py-2 text-sm font-semibold text-red-700"
+                      onClick={() => {
+                        if (window.confirm("Delete this programme and all related data?")) {
+                          deleteProgramme(programme.id);
+                        }
+                      }}
+                      type="button"
+                    >
+                      Delete
+                    </button>
+                  </>
+                ) : programme.role === "editor" ? (
+                  <button
+                    className="rounded-full border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700"
+                    onClick={() => handleExport(programme.id)}
+                    type="button"
+                  >
+                    Export JSON
+                  </button>
+                ) : null}
               </div>
             </article>
           );
