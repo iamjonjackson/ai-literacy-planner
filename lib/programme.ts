@@ -20,7 +20,12 @@ export function formatProgrammeName(id: string) {
 }
 
 export function buildProgrammeRoute(id: string, tab: ProgrammeTab) {
-  return `/programme/${id}/${tab}`;
+  const base = `/programme/${demoProgrammeId}/${tab}`;
+  if (id === demoProgrammeId) {
+    return base;
+  }
+
+  return `${base}?programme=${encodeURIComponent(id)}`;
 }
 
 export function getStaticProgrammeParams() {

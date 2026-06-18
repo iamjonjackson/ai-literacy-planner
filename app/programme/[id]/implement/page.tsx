@@ -7,10 +7,14 @@ import { buildProgrammeRoute } from "@/lib/programme";
 
 export default function ImplementPage() {
   const params = useParams<{ id: string }>();
-  const programmeId = params.id;
+  const programmeId =
+    typeof window !== "undefined"
+      ? new URLSearchParams(window.location.search).get("programme") ?? params.id
+      : params.id;
   const router = useRouter();
   const importRef = useRef<HTMLInputElement>(null);
   const { state, exportProgrammeBackup, importProgrammeBackup } = useAppData();
+
 
   const programme = state.programmes.find((record) => record.id === programmeId);
   const modules = state.modules.filter((module) => module.programmeId === programmeId);

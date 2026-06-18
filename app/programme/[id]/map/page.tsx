@@ -7,8 +7,12 @@ import { useAppData } from "@/lib/app-data";
 
 export default function MapPage() {
   const params = useParams<{ id: string }>();
-  const programmeId = params.id;
+  const programmeId =
+    typeof window !== "undefined"
+      ? new URLSearchParams(window.location.search).get("programme") ?? params.id
+      : params.id;
   const { state, updateLearningOutcome } = useAppData();
+
 
   const modules = state.modules
     .filter((module) => module.programmeId === programmeId)

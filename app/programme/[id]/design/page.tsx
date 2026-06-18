@@ -7,10 +7,14 @@ import { useAppData } from "@/lib/app-data";
 
 export default function DesignPage() {
   const params = useParams<{ id: string }>();
-  const programmeId = params.id;
+  const programmeId =
+    typeof window !== "undefined"
+      ? new URLSearchParams(window.location.search).get("programme") ?? params.id
+      : params.id;
   const { state, addLearningOutcome, updateLearningOutcome, deleteLearningOutcome } = useAppData();
   const [selectedCompetencyId, setSelectedCompetencyId] = useState(frameworkCompetencies[0].id);
   const [draft, setDraft] = useState("");
+
 
   const learningOutcomes = state.learningOutcomes.filter((learningOutcome) => learningOutcome.programmeId === programmeId);
   const coveredCompetencies = new Set(

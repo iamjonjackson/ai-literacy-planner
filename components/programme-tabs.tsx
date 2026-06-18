@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { buildProgrammeRoute, programmeTabs } from "@/lib/programme";
+import { buildProgrammeRoute, demoProgrammeId, programmeTabs } from "@/lib/programme";
 
 type ProgrammeTabsProps = {
   programmeId: string;
@@ -15,7 +15,8 @@ export function ProgrammeTabs({ programmeId }: ProgrammeTabsProps) {
     <nav aria-label="Programme tabs" className="flex flex-wrap gap-2">
       {programmeTabs.map((tab) => {
         const href = buildProgrammeRoute(programmeId, tab.slug);
-        const isActive = pathname === href || pathname === `${href}/`;
+        const activePath = `/programme/${demoProgrammeId}/${tab.slug}`;
+        const isActive = pathname === activePath || pathname === `${activePath}/`;
 
         return (
           <Link

@@ -9,9 +9,13 @@ const rags: RagStatus[] = ["Red", "Amber", "Green"];
 
 export default function AssessPage() {
   const params = useParams<{ id: string }>();
-  const programmeId = params.id;
+  const programmeId =
+    typeof window !== "undefined"
+      ? new URLSearchParams(window.location.search).get("programme") ?? params.id
+      : params.id;
   const { state, addAssessment, updateAssessment, deleteAssessment } = useAppData();
   const [drafts, setDrafts] = useState<Record<string, { title: string; rag: RagStatus }>>({});
+
 
   const modules = state.modules.filter((module) => module.programmeId === programmeId);
   const assessments = state.assessments.filter((assessment) => assessment.programmeId === programmeId);

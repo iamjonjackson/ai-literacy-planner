@@ -122,6 +122,36 @@ const initialState: AppDataState = {
   assessments: [],
 };
 
+function loadInitialState(): AppDataState {
+  if (typeof window === "undefined") {
+    return initialState;
+  }
+
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) {
+      return initialState;
+    }
+
+    const parsed = JSON.parse(raw) as Partial<AppDataState>;
+    if (
+      Array.isArray(parsed.programmes) &&
+      Array.isArray(parsed.modules) &&
+      Array.isArray(parsed.learningOutcomes) &&
+      Array.isArray(parsed.assessments)
+    ) {
+      return {
+        programmes: parsed.programmes,
+        modules: parsed.modules,
+        learningOutcomes: parsed.learningOutcomes,
+        assessments: parsed.assessments,
+      };
+    }
+  } catch {}
+
+  return initialState;
+}
+
 const AppDataContext = createContext<AppDataContextValue | null>(null);
 
 function generateId() {
@@ -139,34 +169,8 @@ function touchProgramme(programmes: Programme[], programmeId: string) {
 }
 
 export function AppDataProvider({ children }: { children: ReactNode }) {
-  const [state, setState] = useState<AppDataState>(initialState);
+  const [state, setState] = useState<AppDataState>(loadInitialState);
   const [isOffline, setIsOffline] = useState(false);
-
-  useEffect(() => {
-    try {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      if (!raw) {
-        return;
-      }
-
-      const parsed = JSON.parse(raw) as Partial<AppDataState>;
-      if (
-        Array.isArray(parsed.programmes) &&
-        Array.isArray(parsed.modules) &&
-        Array.isArray(parsed.learningOutcomes) &&
-        Array.isArray(parsed.assessments)
-      ) {
-        setState({
-          programmes: parsed.programmes,
-          modules: parsed.modules,
-          learningOutcomes: parsed.learningOutcomes,
-          assessments: parsed.assessments,
-        });
-      }
-    } catch {
-      setState(initialState);
-    }
-  }, []);
 
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));

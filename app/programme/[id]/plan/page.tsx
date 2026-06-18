@@ -6,9 +6,13 @@ import { useAppData } from "@/lib/app-data";
 
 export default function PlanPage() {
   const params = useParams<{ id: string }>();
-  const programmeId = params.id;
+  const programmeId =
+    typeof window !== "undefined"
+      ? new URLSearchParams(window.location.search).get("programme") ?? params.id
+      : params.id;
   const { state, addModule, deleteModule, updateModule, updateProgrammeYears } = useAppData();
   const [draftByYear, setDraftByYear] = useState<Record<number, string>>({});
+
 
   const programme = state.programmes.find((record) => record.id === programmeId);
   const modules = state.modules.filter((module) => module.programmeId === programmeId);

@@ -13,9 +13,13 @@ type ProgrammeShellProps = {
 };
 
 export function ProgrammeShell({ programmeId, children }: ProgrammeShellProps) {
+  const resolvedProgrammeId =
+    typeof window !== "undefined"
+      ? new URLSearchParams(window.location.search).get("programme") ?? programmeId
+      : programmeId;
   const { state, isOffline } = useAppData();
-  const programme = state.programmes.find((record) => record.id === programmeId);
-  const programmeName = programme?.name ?? formatProgrammeName(programmeId);
+  const programme = state.programmes.find((record) => record.id === resolvedProgrammeId);
+  const programmeName = programme?.name ?? formatProgrammeName(resolvedProgrammeId);
 
   return (
     <PageShell>
@@ -48,7 +52,7 @@ export function ProgrammeShell({ programmeId, children }: ProgrammeShellProps) {
             You have view-only access to this programme.
           </div>
         ) : null}
-        <ProgrammeTabs programmeId={programmeId} />
+        <ProgrammeTabs programmeId={resolvedProgrammeId} />
       </div>
       {children}
     </PageShell>
