@@ -32,6 +32,12 @@ type Module = {
   credits: string;
   description: string;
   order: number;
+  // Fields populated by CSV import
+  aims?: string;
+  scheme?: string;
+  organiser?: string;
+  url?: string;
+  isCompulsory?: boolean;
 };
 
 type LearningOutcome = {
@@ -60,6 +66,20 @@ type Assessment = {
   learningOutcomeIds: string[];
 };
 
+type CsvModuleImportRow = {
+  code: string;
+  name: string;
+  year: number;
+  isCompulsory: boolean;
+  credits: string;
+  scheme: string;
+  organiser: string;
+  aims: string;
+  url: string;
+  learningOutcomes: Array<{ category: string; loNumber: string; text: string }>;
+  assessments: Array<{ assessmentCode: string; title: string; weight: string; duration?: string }>;
+};
+
 type BackupPayload = {
   programme: Programme;
   modules: Module[];
@@ -82,7 +102,7 @@ type AppDataContextValue = {
   updateProgrammeYears: (programmeId: string, years: number) => void;
   deleteProgramme: (programmeId: string) => void;
   addModule: (programmeId: string, input: { year: number; name: string; code?: string }) => string;
-  updateModule: (moduleId: string, patch: Partial<Pick<Module, "name" | "code" | "credits" | "description" | "year">>) => void;
+  updateModule: (moduleId: string, patch: Partial<Pick<Module, "name" | "code" | "credits" | "description" | "year" | "aims" | "scheme" | "organiser" | "url" | "isCompulsory">>) => void;
   deleteModule: (moduleId: string) => void;
   addLearningOutcome: (programmeId: string, input: { competencyId: string | null; text: string }) => string;
   updateLearningOutcome: (
@@ -103,6 +123,7 @@ type AppDataContextValue = {
   deleteAssessment: (assessmentId: string) => void;
   exportProgrammeBackup: (programmeId: string) => BackupPayload | null;
   importProgrammeBackup: (payload: BackupPayload) => string;
+  importCsvModules: (programmeId: string, rows: CsvModuleImportRow[]) => void;
 };
 
 const initialState: AppDataState = {
@@ -283,7 +304,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
   );
 
   const updateModule = useCallback(
-    (moduleId: string, patch: Partial<Pick<Module, "name" | "code" | "credits" | "description" | "year">>) => {
+    (moduleId: string, patch: Partial<Pick<Module, "name" | "code" | "credits" | "description" | "year" | "aims" | "scheme" | "organiser" | "url" | "isCompulsory">>) => {
       setState((current) => {
         const target = current.modules.find((module) => module.id === moduleId);
         if (!target) {
@@ -463,6 +484,110 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
     });
   }, []);
 
+  const importCsvModules = useCallback((programmeId: string, rows: CsvModuleImportRow[]) => {
+    setState((current) => {
+      const existingModules = current.modules.filter((m) => m.programmeId === programmeId);
+      let modules = [...current.modules];
+      let learningOutcomes = [...current.learningOutcomes];
+      let assessments = [...current.assessments];
+
+      for (const row of rows) {
+        const existingModule = row.code
+          ? existingModules.find((m) => m.code === row.code)
+          : undefined;
+
+        let moduleId: string;
+        if (existingModule) {
+          moduleId = existingModule.id;
+          // Upsert: update module fields
+          modules = modules.map((m) =>
+            m.id === moduleId
+              ? {
+                  ...m,
+                  name: row.name,
+                  year: row.year,
+                  isCompulsory: row.isCompulsory,
+                  credits: row.credits,
+                  scheme: row.scheme,
+                  organiser: row.organiser,
+                  aims: row.aims,
+                  url: row.url,
+                }
+              : m,
+          );
+          // Remove previous imported LOs (competencyId null + category set)
+          learningOutcomes = learningOutcomes.filter(
+            (lo) => !(lo.moduleId === moduleId && lo.competencyId === null && lo.category),
+          );
+          // Remove previous unrated imported assessments
+          assessments = assessments.filter(
+            (a) => !(a.moduleId === moduleId && a.rag === null && a.priority === null),
+          );
+        } else {
+          moduleId = generateId();
+          const siblingsInYear = modules.filter(
+            (m) => m.programmeId === programmeId && m.year === row.year,
+          );
+          modules.push({
+            id: moduleId,
+            programmeId,
+            year: row.year,
+            name: row.name,
+            code: row.code,
+            credits: row.credits,
+            description: "",
+            order: siblingsInYear.length,
+            isCompulsory: row.isCompulsory,
+            scheme: row.scheme,
+            organiser: row.organiser,
+            aims: row.aims,
+            url: row.url,
+          });
+        }
+
+        // Insert new imported LOs
+        for (const lo of row.learningOutcomes) {
+          learningOutcomes.push({
+            id: generateId(),
+            programmeId,
+            competencyId: null,
+            text: lo.text,
+            moduleId,
+            category: lo.category,
+            loNumber: lo.loNumber,
+          });
+        }
+
+        // Insert new imported assessments
+        const moduleLoIds = learningOutcomes
+          .filter((lo) => lo.moduleId === moduleId)
+          .map((lo) => lo.id);
+        for (const a of row.assessments) {
+          assessments.push({
+            id: generateId(),
+            programmeId,
+            moduleId,
+            title: a.title,
+            type: a.assessmentCode ? `${a.assessmentCode}${a.duration ? ` · ${a.duration}` : ""}` : "",
+            description: "",
+            weight: a.weight,
+            priority: null,
+            rag: null,
+            learningOutcomeIds: moduleLoIds,
+          });
+        }
+      }
+
+      return {
+        ...current,
+        programmes: touchProgramme(current.programmes, programmeId),
+        modules,
+        learningOutcomes,
+        assessments,
+      };
+    });
+  }, []);
+
   const exportProgrammeBackup = useCallback(
     (programmeId: string) => {
       const programme = state.programmes.find((record) => record.id === programmeId);
@@ -556,6 +681,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
       deleteAssessment,
       exportProgrammeBackup,
       importProgrammeBackup,
+      importCsvModules,
     }),
     [
       state,
@@ -575,6 +701,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
       deleteAssessment,
       exportProgrammeBackup,
       importProgrammeBackup,
+      importCsvModules,
     ],
   );
 
@@ -590,4 +717,4 @@ export function useAppData() {
   return context;
 }
 
-export type { Programme, Module, LearningOutcome, Assessment, BackupPayload, PriorityRating, RagStatus };
+export type { Programme, Module, LearningOutcome, Assessment, BackupPayload, PriorityRating, RagStatus, CsvModuleImportRow };
