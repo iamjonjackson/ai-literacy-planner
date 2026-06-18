@@ -212,8 +212,8 @@ function getModuleDeletionImpactFromState(
   state: AppDataState,
   moduleId: string,
 ): ModuleDeletionImpact | null {
-  const module = state.modules.find((record) => record.id === moduleId);
-  if (!module) {
+  const moduleRecord = state.modules.find((record) => record.id === moduleId);
+  if (!moduleRecord) {
     return null;
   }
 
@@ -224,8 +224,8 @@ function getModuleDeletionImpactFromState(
 
   return {
     moduleId,
-    programmeId: module.programmeId,
-    moduleName: module.name,
+    programmeId: moduleRecord.programmeId,
+    moduleName: moduleRecord.name,
     mappedLearningOutcomeCount: state.learningOutcomes.filter((learningOutcome) => learningOutcome.moduleId === moduleId)
       .length,
     assessmentCount: moduleAssessments.length,

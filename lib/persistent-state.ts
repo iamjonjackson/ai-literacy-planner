@@ -22,10 +22,6 @@ export function usePersistentState<T>(
   const [value, setValue] = useState<T>(() => readStoredValue(key, fallback));
 
   useEffect(() => {
-    setValue(readStoredValue(key, fallback));
-  }, [key, fallback]);
-
-  useEffect(() => {
     if (typeof window === "undefined") {
       return;
     }
