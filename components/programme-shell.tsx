@@ -29,7 +29,7 @@ export function ProgrammeShell({ programmeId, children }: ProgrammeShellProps) {
             <p className="text-sm font-medium uppercase tracking-[0.2em] text-blue-600">Programme workspace</p>
             <div>
               <h1 className="text-3xl font-semibold text-slate-900">{programmeName}</h1>
-              <p className="text-sm text-slate-600">Design, map, and assess AI literacy outcomes.</p>
+              {/* <p className="text-sm text-slate-600">Design, map, and assess AI literacy outcomes.</p> */}
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-3 text-sm">

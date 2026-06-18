@@ -12,15 +12,15 @@ const references = [
   },
   {
     label:
-      "Nicola-Richmond et al. (2026) Implementing a collaborative program-wide approach to redeveloping assessment...",
+      "Nicola-Richmond, K. et al. (2026) ‘Implementing a collaborative program-wide approach to redeveloping assessment in response to generative artificial intelligence (GenAI)’, Assessment & Evaluation in Higher Education, 0(0), pp. 1–17. Available at: https://doi.org/10.1080/02602938.2026.2653886.",
     href: "https://doi.org/10.1080/02602938.2026.2653886",
   },
   {
-    label: "Corbin et al. (2025) The wicked problem of AI and assessment",
+    label: "Corbin, T. et al. (2025) ‘The wicked problem of AI and assessment’, Assessment & Evaluation in Higher Education. Available at: https://doi.org/10.1080/02602938.2025.2553340.",
     href: "https://doi.org/10.1080/02602938.2025.2553340",
   },
   {
-    label: "Corbin, Dawson and Liu (2025) Talk is cheap",
+    label: "Corbin, T., Dawson, P. and Liu, D. (2025) ‘Talk is cheap: why structural assessment changes are needed for a time of GenAI’, Assessment & Evaluation in Higher Education, 50(7), pp. 1087–1097.",
     href: "https://www.tandfonline.com/doi/abs/10.1080/02602938.2025.2503964",
   },
 ];
@@ -56,10 +56,10 @@ export default function ExplorePage() {
       return (
         competency.title.toLowerCase().includes(query) ||
         competency.id.includes(query) ||
-        competency.narrative.toLowerCase().includes(query) ||
-        competency.levels.understand.toLowerCase().includes(query) ||
-        competency.levels.apply.toLowerCase().includes(query) ||
-        competency.levels.create.toLowerCase().includes(query)
+        competency.narrative?.toLowerCase().includes(query) ||
+        competency.levels.understand?.toLowerCase().includes(query) ||
+        competency.levels.apply?.toLowerCase().includes(query) ||
+        competency.levels.create?.toLowerCase().includes(query)
       );
     });
   }, [search]);
@@ -73,6 +73,11 @@ export default function ExplorePage() {
     filteredCompetencies[0] ??
     frameworkCompetencies[0];
   const selectedDimensionRecord = findDimension(selectedCompetency.dimensionId);
+  const availableLevels = (["understand", "apply", "create"] as const).filter((level) =>
+    selectedCompetency.levels[level]?.trim(),
+  );
+  const resolvedSelectedLevel =
+    availableLevels.find((level) => level === selectedLevel) ?? availableLevels[0] ?? "understand";
 
   return (
     <div className="grid gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(280px,1fr)]">
@@ -93,20 +98,34 @@ export default function ExplorePage() {
           </button>
         </div>
 
-        <div className="flex flex-wrap gap-2">
-          {frameworkDimensions.map((dimension) => (
-            <button
-              key={dimension.id}
-              type="button"
-              className={`rounded-full px-4 py-2 text-sm font-medium ${
-                selectedDimension === dimension.id ? "bg-blue-600 text-white" : "bg-slate-100 text-slate-700"
-              }`}
-              onClick={() => setSelectedDimension(dimension.id)}
-            >
-              {dimension.label}
-            </button>
-          ))}
-        </div>
+        {!showGrid && (
+          <div className="flex flex-wrap gap-2">
+            {frameworkDimensions.map((dimension) => (
+              <button
+                key={dimension.id}
+                type="button"
+                className={`rounded-full px-4 py-2 text-sm font-medium ${
+                  selectedDimension === dimension.id ? "bg-blue-600 text-white" : "bg-slate-100 text-slate-700"
+                }`}
+                onClick={() => {
+                  setSelectedDimension(dimension.id);
+                  const firstCompetencyInDimension = filteredCompetencies.find(
+                    (competency) => competency.dimensionId === dimension.id,
+                  );
+                  if (firstCompetencyInDimension) {
+                    setSelectedCompetencyId(firstCompetencyInDimension.id);
+                    const nextAvailableLevels = (["understand", "apply", "create"] as const).filter((level) =>
+                      firstCompetencyInDimension.levels[level]?.trim(),
+                    );
+                    setSelectedLevel(nextAvailableLevels[0] ?? "understand");
+                  }
+                }}
+              >
+                {dimension.label}
+              </button>
+            ))}
+          </div> 
+        )}
 
         {showGrid ? (
           <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
@@ -146,11 +165,32 @@ export default function ExplorePage() {
                   }`}
                   onClick={() => {
                     setSelectedCompetencyId(competency.id);
-                    setSelectedLevel("understand");
+                    const nextAvailableLevels = (["understand", "apply", "create"] as const).filter((level) =>
+                      competency.levels[level]?.trim(),
+                    );
+                    setSelectedLevel(nextAvailableLevels[0] ?? "understand");
                   }}
                 >
                   <p className="text-xs text-slate-500">{competency.id}</p>
                   <p className="text-sm font-medium text-slate-900">{competency.title}</p>
+                  <div className="mt-2 flex flex-wrap gap-1">
+                    {(["understand", "apply", "create"] as const).map((level) => {
+                      if (!competency.levels[level]?.trim()) {
+                        return null;
+                      }
+                      return (
+                        <span
+                          key={level}
+                          className={`rounded-full px-2 py-1 text-xs font-semibold uppercase tracking-wide ${
+                            resolvedSelectedLevel === level ? "bg-blue-600 text-white" : "bg-slate-100 text-slate-700"
+                          }`}
+                        >
+                          {level}
+                        </span>
+                      );
+                    })}
+                  </div>
+
                 </button>
               ))}
             </div>
@@ -165,12 +205,12 @@ export default function ExplorePage() {
                 </span>
               </div>
               <div className="mt-4 flex flex-wrap gap-2">
-                {(["understand", "apply", "create"] as const).map((level) => (
+                {availableLevels.map((level) => (
                   <button
                     key={level}
                     type="button"
                     className={`rounded-full px-3 py-1.5 text-xs font-semibold uppercase tracking-wide ${
-                      selectedLevel === level ? "bg-blue-600 text-white" : "bg-slate-100 text-slate-700"
+                      resolvedSelectedLevel === level ? "bg-blue-600 text-white" : "bg-slate-100 text-slate-700"
                     }`}
                     onClick={() => setSelectedLevel(level)}
                   >
@@ -179,7 +219,7 @@ export default function ExplorePage() {
                 ))}
               </div>
               <p className="mt-4 rounded-xl bg-slate-50 p-4 text-sm text-slate-700">
-                {selectedCompetency.levels[selectedLevel]}
+                {selectedCompetency.levels[resolvedSelectedLevel]}
               </p>
               <p className="mt-4 text-sm leading-7 text-slate-700">{selectedCompetency.narrative}</p>
             </article>

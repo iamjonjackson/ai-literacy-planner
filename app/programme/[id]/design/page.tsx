@@ -57,7 +57,7 @@ export default function DesignPage() {
 
       <div className="grid gap-6 lg:grid-cols-[320px_minmax(0,1fr)]">
         <section className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm">
-          <h3 className="text-sm font-semibold uppercase tracking-[0.2em] text-slate-500">Competencies</h3>
+          <h3 className="text-sm font-semibold uppercase tracking-[0.2em] text-slate-500">AI Competencies</h3>
           <div className="mt-3 space-y-4">
             {Array.from(new Set(frameworkCompetencies.map((competency) => competency.dimensionId))).map((dimensionId) => {
               const dimension = findDimension(dimensionId);
@@ -91,7 +91,12 @@ export default function DesignPage() {
                             <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{competency.id}</p>
                             <p className="text-sm font-semibold text-slate-900">{competency.title}</p>
                           </div>
-                          <span className="rounded-full bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-600">
+                          {/* if {count} > 0 change to green pill */}
+                          <span
+                            className={`inline-block rounded-full px-2 py-1 text-xs font-semibold ${
+                              count > 0 ? "bg-emerald-100 text-emerald-700" : "bg-slate-100 text-slate-700"
+                            }`}
+                          >
                             {count} LOs
                           </span>
                         </div>
@@ -172,11 +177,38 @@ export default function DesignPage() {
           <h3 className="text-xl font-semibold text-slate-900">
             {selectedCompetency?.id} {selectedCompetency?.title}
           </h3>
-          <p className="mt-2 text-sm text-slate-600">
-            Understand: {selectedCompetency?.levels.understand}
-          </p>
-          <p className="mt-1 text-sm text-slate-600">Apply: {selectedCompetency?.levels.apply}</p>
-          <p className="mt-1 text-sm text-slate-600">Create: {selectedCompetency?.levels.create}</p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            {selectedCompetency?.levels.understand ? (
+              <>
+                <span className="inline-flex rounded-full bg-blue-100 px-3 py-1 text-xs font-semibold text-blue-700">
+                  Understand
+                </span>
+                <p className="text-sm text-slate-600">
+                  {selectedCompetency.levels.understand}
+                </p>
+              </>
+            ) : null}
+            {selectedCompetency?.levels.apply ? (
+              <>
+                <span className="inline-flex rounded-full bg-blue-100 px-3 py-1 text-xs font-semibold text-blue-700">
+                  Apply
+                </span>
+                <p className="text-sm text-slate-600">
+                  {selectedCompetency.levels.apply}
+                </p>
+              </>
+            ) : null}
+            {selectedCompetency?.levels.create ? (
+              <>
+                <span className="inline-flex rounded-full bg-blue-100 px-3 py-1 text-xs font-semibold text-blue-700">
+                  Create
+                </span>
+                <p className="text-sm text-slate-600">
+                  {selectedCompetency.levels.create}
+                </p>
+              </>
+            ) : null}
+          </div>
 
           <div className="mt-6 space-y-3">
             {competencyOutcomes.length === 0 ? (

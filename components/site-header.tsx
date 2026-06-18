@@ -11,7 +11,7 @@ export function SiteHeader() {
       <div className="mx-auto flex w-full max-w-7xl items-center justify-between gap-4 px-6 py-4">
         <div>
           <Link href="/dashboard" className="text-lg font-semibold text-slate-900">
-            UNESCO AI Competency Explorer
+            AI Literacy Programme Redesign Tool
           </Link>
           <p className="text-sm text-slate-600">AI literacy planning workspace.</p>
         </div>
@@ -26,7 +26,7 @@ export function SiteHeader() {
           <Link className="rounded-full px-3 py-2 hover:bg-slate-100" href="/login">
             Login
           </Link>
-          <Link className="rounded-full bg-blue-600 px-4 py-2 text-white hover:bg-blue-700" href="/dashboard">
+          <Link className="rounded-full bg-blue-200 px-4 py-2 text-white hover:bg-blue-300" href="/dashboard">
             Dashboard
           </Link>
         </nav>

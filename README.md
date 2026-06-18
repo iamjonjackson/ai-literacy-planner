@@ -1,6 +1,6 @@
 # AI Literacy Planner
 
-Repository for the UNESCO AI Competency Explorer and supporting reference material.
+Repository for the AI Competency Explorer and AI Literacy Programme Redesign tool.
 
 ## Documents
 

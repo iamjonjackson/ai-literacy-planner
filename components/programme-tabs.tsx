@@ -37,7 +37,7 @@ export function ProgrammeTabs({ programmeId }: ProgrammeTabsProps) {
                 : "border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:text-slate-900"
             }`}
           >
-            <span className="inline-flex items-center gap-2">
+            <span className={`flex items-center gap-2 ${isActive ? "text-white" : ""}`}>
               <span>{tab.label}</span>
               {tab.slug === "design" && designIncomplete && !isActive ? (
                 <span

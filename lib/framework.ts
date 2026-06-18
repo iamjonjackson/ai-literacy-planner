@@ -8,12 +8,13 @@ export type FrameworkCompetency = {
   id: string;
   title: string;
   dimensionId: string;
+  level?: "understand" | "apply" | "create";
   levels: {
-    understand: string;
-    apply: string;
-    create: string;
+    understand?: string;
+    apply?: string;
+    create?: string;
   };
-  narrative: string;
+  narrative?: string;
 };
 
 export const frameworkDimensions: FrameworkDimension[] = [
@@ -32,145 +33,107 @@ export const frameworkCompetencies: FrameworkCompetency[] = [
     id: "1.1",
     title: "Human Agency",
     dimensionId: "human-centred-mindset",
+    level: "understand",
     levels: {
-      understand: "Explain how people retain meaningful control over AI-supported decisions.",
-      apply: "Use AI tools while documenting human judgement and intervention points.",
-      create: "Design workflows that protect learner autonomy when AI is introduced.",
+      understand: "Students are expected to be able to recognize that AI is human-led and that the decisions of the AI creators influence how AI systems impact human rights, human–AI  interaction, and their own lives and societies. They are expected to understand the implications of protecting human agency throughout the design, provision and use of AI. Students will understand what it means for AI to be human-controlled, and what the consequences could be when that is not the case. ",
     },
-    narrative:
-      "Human agency focuses on keeping people in charge of purpose, oversight, and accountability when using AI in educational and professional settings.",
   },
   {
     id: "1.2",
     title: "Human Accountability",
     dimensionId: "human-centred-mindset",
+    level: "apply",
     levels: {
-      understand: "Describe who is responsible for AI-supported outcomes.",
-      apply: "Attribute decisions to named human roles when AI informs recommendations.",
-      create: "Build governance structures that assign clear accountability for AI use.",
+      apply: "Students are expected to recognize that human accountabilities are the legal obligations of AI creators and AI service providers, and to understand what human accountabilities they should assume during the design and use of AI. They should also develop an awareness that human accountability is a legal and social responsibility when using AI to assist in decision-making, and that human choice should not be ceded to AI when making high-stakes decisions. ",
     },
-    narrative:
-      "Students should recognise that responsibility for outcomes remains with people and institutions, not AI systems themselves.",
   },
   {
     id: "1.3",
-    title: "Human Rights and Inclusion",
+    title: "Citizenship in the era of AI",
     dimensionId: "human-centred-mindset",
+    level: "create",
     levels: {
-      understand: "Identify rights and inclusion risks when AI is deployed.",
-      apply: "Evaluate AI use cases for fairness and accessibility impacts.",
-      create: "Design inclusive AI-supported learning practices that protect rights.",
+      create: "Students are expected to critically understand the impact of AI on human societies and to promote responsible and inclusive design and use of AI for sustainable development. They should have an awareness of their civic and social responsibility as citizens in the era of AI. Students are also expected to develop a desire to continue learning about, and using, AI throughout their lives to support self-actualization.",
     },
-    narrative:
-      "This competency foregrounds inclusion, accessibility, and rights-based thinking in AI-supported education.",
   },
   {
     id: "2.1",
-    title: "Ethical Reflection",
+    title: "Embodied ethics",
     dimensionId: "ethics-of-ai",
     levels: {
-      understand: "Explain core ethical principles relevant to AI.",
-      apply: "Use ethical lenses to evaluate trade-offs in AI-enabled tasks.",
-      create: "Produce assessment designs that make ethical reasoning explicit.",
+      understand: "Students are expected to develop a basic understanding of the issues underlying key ethical debates around AI, including the impact of AI on human rights, social justice, inclusion, equity and climate change within their local context and personal lives. They will have understood, internalized, and adopted the following principles in their reflective practices and uses of AI tools in their learning and beyond. // Do no harm: Students demonstrate an understanding that AI systems should not be used for purposes that might be harmful for humans (such as facial recognition for surveillance or assigning social status, or predictive algorithms for grading examinations). This includes the ability to assess whether a certain AI solution infringes upon human values and rights, particularly data privacy, and to decide on whether a particular AI method complies with global or local regulations. // Proportionality: Students develop the capacity – as appropriate for their age and ability level – to examine whether or not the use of a specific AI system is advantageous in achieving a justified aim, and whether or not a given AI method is appropriate to the context. // Non-discrimination: Students are aware of and are able to detect gender, ethnic, cultural and other biases embedded in AI tools or their outputs. Further, students are aware of AI divides within and between countries, and understand the need to make efforts to address these and ensure greater accessibility and inclusivity. // Sustainability: Students are able to explain and illustrate the implications of AI systems for environmental sustainability. // Human determination in human–AI collaboration: Students are able to demonstrate why humans should bear ethical and legal responsibilities for the use of AI; they are able to exemplify how humans can remain accountable in AI-assisted decision-making loops, rather than cede determination to machines. // Transparency and explainability:Students are aware that users are entitled to request explanatory information from designers and providers on how AI tools work, how their outputs are produced based on algorithms and models, and the degree to which the deployment and application of certain AI tools are appropriate for users of a certain age or ability level.",
     },
-    narrative:
-      "Ethical reflection supports informed judgement in uncertain contexts where AI creates new choices and consequences.",
   },
   {
     id: "2.2",
-    title: "Bias and Fairness",
+    title: "Safe and responsible use",
     dimensionId: "ethics-of-ai",
     levels: {
-      understand: "Recognise how bias can enter datasets and models.",
-      apply: "Test AI outputs for unfair patterns and document findings.",
-      create: "Develop mitigation strategies for unfair or harmful model behaviour.",
+      apply: "Students are expected to be able to use AI in a responsible manner in compliance with ethical principles and locally applicable regulations. They are aware of the risks of disclosing data privacy and they take measures to ensure that their data are collected, used, shared, archived and deleted only with their deliberate and informed consent. They are also aware of the specific risks of certain AI systems, and are able to protect their own safety, as well as that of their peers, when using AI.",
     },
-    narrative:
-      "Learners should be able to identify inequity risks and respond with concrete fairness safeguards.",
   },
   {
     id: "2.3",
-    title: "Privacy and Data Stewardship",
+    title: "Ethics by design",
     dimensionId: "ethics-of-ai",
+    level: "create",
     levels: {
-      understand: "Describe data privacy principles and consent requirements.",
-      apply: "Select AI workflows that minimise unnecessary personal data exposure.",
-      create: "Design compliant data handling processes for AI-enabled work.",
+      create: "Students are expected to adopt an ethics-by-design approach to the design, assessment and use of AI tools, as well as to the review and adaptation of AI regulations. Students are aware that assessing the intent behind AI design involves examining all steps of the AI life cycle, starting with the stage of conceptualization. Students should be able to assess the compliance of an AI tool with ethical regulations, as well as review AI regulations and inform adaptation.",
     },
-    narrative:
-      "Privacy literacy is foundational for safe AI use in education and employment contexts.",
   },
   {
     id: "3.1",
-    title: "AI Concepts and Methods",
+    title: "AI foundations",
     dimensionId: "ai-techniques-and-applications",
+    level: "understand",
     levels: {
-      understand: "Describe key AI concepts including training, inference, and evaluation.",
-      apply: "Use AI techniques appropriately for bounded practical tasks.",
-      create: "Compose multi-step workflows combining suitable AI methods.",
+      understand: "Students are expected to be able to build basic knowledge and skills on AI, particularly with respect to data and algorithms, understanding the importance of the interdisciplinary foundational knowledge required to gradually deepen understanding of data and algorithms. Students should also be able to connect conceptual knowledge on AI with their activities in society and daily life, concretizing a human-centred mindset and ethical principles by understanding how AI works and how AI interacts with humans.",
     },
-    narrative:
-      "Students should know what AI methods can and cannot do, and when each approach is suitable.",
   },
   {
     id: "3.2",
-    title: "Data and Representation",
+    title: "Application skills",
     dimensionId: "ai-techniques-and-applications",
+    level: "apply",
     levels: {
-      understand: "Explain how data quality shapes model performance.",
-      apply: "Prepare and critique data representations used by AI tools.",
-      create: "Develop data strategies that improve model reliability and transparency.",
+      apply: "Students are expected to be able to construct an age-appropriate understanding of data, AI algorithms and programming, as well as acquire transferable application skills. Students are expected to be able to critically evaluate and leverage free and/or open-source AI tools, programming libraries and datasets. ",
     },
-    narrative:
-      "Reliable AI outcomes depend on sound data handling and critical review of representation choices.",
   },
   {
     id: "3.3",
-    title: "Prompting and Interaction",
+    title: "Creating AI tools",
     dimensionId: "ai-techniques-and-applications",
+    level: "create",
     levels: {
-      understand: "Explain how interaction patterns influence AI output quality.",
-      apply: "Craft prompts that improve relevance, structure, and verification.",
-      create: "Design reusable interaction protocols for discipline-specific AI tasks.",
+      create: "Students are expected to be able to deepen and apply knowledge and skills on data and algorithms to customize existing AI toolkits to create task-based AI tools. Students are expected to integrate their human-centred mindset and ethical considerations into the assessment of existing AI resources. They are also expected to develop the social and emotional skills needed to engage in creating with AI, including through adaptivity, complex communication and teamwork skills.",
+      },
     },
-    narrative:
-      "Effective interaction skills help students obtain dependable outputs and reduce misuse risks.",
-  },
-  {
-    id: "4.1",
-    title: "Problem Framing",
-    dimensionId: "ai-system-design",
-    levels: {
-      understand: "Define problems that can be responsibly supported by AI.",
-      apply: "Set success criteria and constraints before introducing AI tools.",
-      create: "Formulate robust AI project briefs with measurable outcomes.",
+    {
+      id: "4.1",
+      title: "Problem scoping",
+      dimensionId: "ai-system-design",
+      level: "understand",
+      levels: {
+        understand: "Students are expected to be able to understand the importance of ‘AI problem scoping’ as the starting point for AI innovation. They are expected to be able to examine whether AI should be used in particular situations, from a legal, ethical and logical perspective; and to define the boundaries, goals and constraints of a problem before attempting to train an AI model to solve it. Students are also expected to acquire the knowledge and project-planning skills needed in order to conceptualize and construct an AI system, including the ability to assess the appropriateness of different AI techniques, define the need for data, and devise test and feedback metrics.",
     },
-    narrative:
-      "Good system design starts with clear framing, constraints, and value-oriented objectives.",
   },
   {
     id: "4.2",
-    title: "System Evaluation",
+    title: "Architecture design",
     dimensionId: "ai-system-design",
+    level: "apply",
     levels: {
-      understand: "Describe evaluation metrics and validation approaches for AI outputs.",
-      apply: "Run structured checks for quality, reliability, and safety.",
-      create: "Build evaluation plans that include human review and improvement loops.",
+      apply: "Students are expected to be able to cultivate basic methodological knowledge and technical skills to configure a scalable, maintainable and reusable architecture for an AI system covering layers of data, algorithms, models and application interfaces. Students are expected to develop the interdisciplinary skills necessary to leverage datasets, programming tools and computational resources to construct a prototype AI system. This includes the expectation that they apply deepened human-centred values and ethical principles in their configuration, construction and optimization.",
     },
-    narrative:
-      "Evaluation competency ensures that AI-enabled systems are tested against educational goals and risks.",
   },
   {
     id: "4.3",
-    title: "Responsible Deployment",
+    title: "Iteration and feedback loops",
     dimensionId: "ai-system-design",
+    level: "create",
     levels: {
-      understand: "Identify deployment risks, stakeholders, and governance requirements.",
-      apply: "Implement rollout controls, monitoring, and escalation pathways.",
-      create: "Design sustainable deployment models that include policy and staff capability.",
+      create: "Students are expected to enhance and apply their interdisciplinary knowledge and practical methods to evaluate the appropriateness and methodological robustness of an AI model and its impact on individual users, societies and the environment. They should be able to acquire age-appropriate technical skills to improve the quality of datasets, reconfigure algorithms and enhance architectures in response to results of tests and feedback. They should be able to apply a human-centred mindset and ethical principles in simulating decision-making on when an AI system should be shut down and how its negative impact can be mitigated. They are also be expected to cultivate their identities as co-creators within the wider AI community.",
     },
-    narrative:
-      "Responsible deployment links technical setup with governance, monitoring, and continuous review.",
   },
 ];
 

@@ -219,7 +219,8 @@ export default function MapPage() {
 
                     return (
                       <span key={learningOutcome.id} className="rounded-full bg-blue-50 px-3 py-1 text-xs text-blue-700">
-                        {competency?.id ?? "Imported"}: {learningOutcome.text.slice(0, 80)}
+                        {/* {competency?.id ?? "Imported"}:  */}
+                        {learningOutcome.text.slice(0, 80)}
                       </span>
                     );
                   })}
@@ -241,10 +242,15 @@ export default function MapPage() {
               const competency = frameworkCompetencies.find((record) => record.id === learningOutcome.competencyId);
 
               return (
-                <article key={learningOutcome.id} className="rounded-xl border border-slate-200 p-3">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                <article
+                  key={learningOutcome.id}
+                  className={`rounded-xl border p-3 ${
+                    learningOutcome.moduleId ? "border-green-500 bg-green-50" : "border-slate-200"
+                  }`}
+                >
+                  {/* <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
                     {competency?.id ?? "Imported LO"}
-                  </p>
+                  </p> */}
                   <p className="mt-1 text-sm text-slate-700">{learningOutcome.text}</p>
                   <div className="mt-3 flex gap-2">
                     <select
