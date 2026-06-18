@@ -6,12 +6,23 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from "react";
 import { demoProgrammeId } from "@/lib/programme";
-
-const STORAGE_KEY = "ai-literacy-planner-v2";
+import {
+  loadAllFromIdb,
+  saveAllToIdb,
+  getPendingRecords,
+  markSynced,
+  mergeFromSupabase,
+  type IdbProgramme,
+  type IdbModule,
+  type IdbLearningOutcome,
+  type IdbAssessment,
+} from "@/lib/idb-store";
+import { getSupabaseClient } from "@/lib/supabase";
 
 type Programme = {
   id: string;
@@ -103,6 +114,8 @@ type BulkModuleDeletionResult = {
   skippedModules: string[];
 };
 
+export type { PriorityRating, RagStatus };
+
 type AppDataState = {
   programmes: Programme[];
   modules: Module[];
@@ -110,10 +123,15 @@ type AppDataState = {
   assessments: Assessment[];
 };
 
+type SyncState = "idle" | "syncing" | "offline";
+
 type AppDataContextValue = {
   state: AppDataState;
   isOffline: boolean;
+  syncState: SyncState;
+  pendingCount: number;
   createProgramme: (input: { name: string; description: string; years: number }) => string;
+  updateProgramme: (programmeId: string, patch: Partial<Pick<Programme, "name" | "description" | "years">>) => void;
   renameProgramme: (programmeId: string, name: string) => void;
   updateProgrammeYears: (programmeId: string, years: number) => void;
   deleteProgramme: (programmeId: string) => void;
@@ -162,34 +180,10 @@ const initialState: AppDataState = {
   assessments: [],
 };
 
-function loadInitialState(): AppDataState {
-  if (typeof window === "undefined") {
-    return initialState;
-  }
-
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) {
-      return initialState;
-    }
-
-    const parsed = JSON.parse(raw) as Partial<AppDataState>;
-    if (
-      Array.isArray(parsed.programmes) &&
-      Array.isArray(parsed.modules) &&
-      Array.isArray(parsed.learningOutcomes) &&
-      Array.isArray(parsed.assessments)
-    ) {
-      return {
-        programmes: parsed.programmes,
-        modules: parsed.modules,
-        learningOutcomes: parsed.learningOutcomes,
-        assessments: parsed.assessments,
-      };
-    }
-  } catch {}
-
-  return initialState;
+function idbRecordToState<T>(record: T): T {
+  // IDB records have extra fields (syncStatus, localUpdatedAt) that we carry
+  // through transparently — they don't affect in-memory state behaviour.
+  return record;
 }
 
 const AppDataContext = createContext<AppDataContextValue | null>(null);
@@ -281,15 +275,73 @@ function deleteModulesFromState(
 }
 
 export function AppDataProvider({ children }: { children: ReactNode }) {
-  const [state, setState] = useState<AppDataState>(loadInitialState);
+  const [state, setState] = useState<AppDataState>(initialState);
   const [isOffline, setIsOffline] = useState(false);
+  const [syncState, setSyncState] = useState<SyncState>("idle");
+  const [pendingCount, setPendingCount] = useState(0);
+  const idbLoadedRef = useRef(false);
+  const syncIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
+  // ── Load from IndexedDB on mount ──────────────────────────────────────────
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    if (idbLoadedRef.current) return;
+    idbLoadedRef.current = true;
+
+    loadAllFromIdb()
+      .then(({ programmes, modules, learningOutcomes, assessments }) => {
+        if (
+          programmes.length > 0 ||
+          modules.length > 0 ||
+          learningOutcomes.length > 0 ||
+          assessments.length > 0
+        ) {
+          setState({
+            programmes: programmes.map(idbRecordToState),
+            modules: modules.map(idbRecordToState),
+            learningOutcomes: learningOutcomes.map(idbRecordToState),
+            assessments: assessments.map(idbRecordToState),
+          });
+        }
+      })
+      .catch(() => {
+        // IndexedDB not available — fall back to initial state
+      });
+  }, []);
+
+  // ── Persist to IndexedDB whenever state changes ───────────────────────────
+  useEffect(() => {
+    const ts = new Date().toISOString();
+    saveAllToIdb({
+      programmes: state.programmes.map((p) => ({
+        ...p,
+        syncStatus: "pending" as const,
+        localUpdatedAt: ts,
+      })) as IdbProgramme[],
+      modules: state.modules.map((m) => ({
+        ...m,
+        syncStatus: "pending" as const,
+        localUpdatedAt: ts,
+      })) as IdbModule[],
+      learningOutcomes: state.learningOutcomes.map((lo) => ({
+        ...lo,
+        syncStatus: "pending" as const,
+        localUpdatedAt: ts,
+      })) as IdbLearningOutcome[],
+      assessments: state.assessments.map((a) => ({
+        ...a,
+        syncStatus: "pending" as const,
+        localUpdatedAt: ts,
+      })) as IdbAssessment[],
+    }).catch(() => {});
   }, [state]);
 
+  // ── Online / offline detection ────────────────────────────────────────────
   useEffect(() => {
-    const updateStatus = () => setIsOffline(!navigator.onLine);
+    const updateStatus = () => {
+      const offline = !navigator.onLine;
+      setIsOffline(offline);
+      setSyncState(offline ? "offline" : "idle");
+    };
     updateStatus();
     window.addEventListener("online", updateStatus);
     window.addEventListener("offline", updateStatus);
@@ -299,6 +351,147 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
       window.removeEventListener("offline", updateStatus);
     };
   }, []);
+
+  // ── Supabase background sync ──────────────────────────────────────────────
+  const doSync = useCallback(async () => {
+    const supabase = getSupabaseClient();
+    if (!supabase || isOffline) return;
+
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+
+      setSyncState("syncing");
+
+      // Push pending writes
+      const pending = await getPendingRecords();
+      const totalPending =
+        pending.programmes.length +
+        pending.modules.length +
+        pending.learningOutcomes.length +
+        pending.assessments.length;
+
+      setPendingCount(totalPending);
+
+      // Push programmes
+      for (const programme of pending.programmes) {
+        const { error } = await supabase.from("programmes").upsert({
+          id: programme.id,
+          name: programme.name,
+          description: programme.description,
+          years: programme.years,
+          updated_at: programme.updatedAt,
+        });
+        if (!error) await markSynced("programmes", programme.id);
+      }
+
+      // Push modules
+      for (const module of pending.modules) {
+        const { error } = await supabase.from("modules").upsert({
+          id: module.id,
+          programme_id: module.programmeId,
+          name: module.name,
+          code: module.code,
+          year: module.year,
+          order: module.order,
+          credits: module.credits,
+          description: module.description,
+          aims: module.aims,
+          scheme: module.scheme,
+          organiser: module.organiser,
+          url: module.url,
+          is_compulsory: module.isCompulsory,
+          updated_at: module.updatedAt,
+        });
+        if (!error) await markSynced("modules", module.id);
+      }
+
+      // Push learning outcomes
+      for (const lo of pending.learningOutcomes) {
+        const { error } = await supabase.from("learning_outcomes").upsert({
+          id: lo.id,
+          programme_id: lo.programmeId,
+          competency_id: lo.competencyId,
+          text: lo.text,
+          module_id: lo.moduleId,
+          category: lo.category,
+          lo_number: lo.loNumber,
+          updated_at: lo.updatedAt,
+        });
+        if (!error) await markSynced("learning_outcomes", lo.id);
+      }
+
+      // Push assessments
+      for (const assessment of pending.assessments) {
+        const { error } = await supabase.from("assessments").upsert({
+          id: assessment.id,
+          programme_id: assessment.programmeId,
+          module_id: assessment.moduleId,
+          title: assessment.title,
+          type: assessment.type,
+          description: assessment.description,
+          weight: assessment.weight,
+          priority_rating: assessment.priority?.toLowerCase() ?? null,
+          rag_status: assessment.rag?.toLowerCase() ?? null,
+          updated_at: assessment.updatedAt,
+        });
+        if (!error) await markSynced("assessments", assessment.id);
+      }
+
+      // Pull latest data from Supabase
+      const { data: programmes } = await supabase
+        .from("programmes")
+        .select("*")
+        .order("updated_at", { ascending: false });
+
+      if (programmes) {
+        const mappedProgrammes: IdbProgramme[] = programmes.map((p: Record<string, unknown>) => ({
+          id: p.id as string,
+          name: p.name as string,
+          description: (p.description as string) ?? "",
+          years: p.years as number,
+          ownerEmail: (p.owner_email as string) ?? "",
+          role: (p.role as "owner" | "editor" | "viewer") ?? "owner",
+          updatedAt: p.updated_at as string,
+          syncStatus: "synced" as const,
+          localUpdatedAt: p.updated_at as string,
+        }));
+
+        const changed = await mergeFromSupabase({ programmes: mappedProgrammes });
+        if (changed) {
+          const fresh = await loadAllFromIdb();
+          setState({
+            programmes: fresh.programmes.map(idbRecordToState),
+            modules: fresh.modules.map(idbRecordToState),
+            learningOutcomes: fresh.learningOutcomes.map(idbRecordToState),
+            assessments: fresh.assessments.map(idbRecordToState),
+          });
+        }
+      }
+
+      // Recount pending
+      const stillPending = await getPendingRecords();
+      const remaining =
+        stillPending.programmes.length +
+        stillPending.modules.length +
+        stillPending.learningOutcomes.length +
+        stillPending.assessments.length;
+      setPendingCount(remaining);
+      setSyncState("idle");
+    } catch {
+      setSyncState(isOffline ? "offline" : "idle");
+    }
+  }, [isOffline]);
+
+  useEffect(() => {
+    doSync();
+    syncIntervalRef.current = setInterval(doSync, 5000);
+    return () => {
+      if (syncIntervalRef.current) {
+        clearInterval(syncIntervalRef.current);
+      }
+    };
+  }, [doSync]);
 
   const createProgramme = useCallback(
     (input: { name: string; description: string; years: number }) => {
@@ -315,6 +508,20 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
 
       setState((current) => ({ ...current, programmes: [record, ...current.programmes] }));
       return programmeId;
+    },
+    [],
+  );
+
+  const updateProgramme = useCallback(
+    (programmeId: string, patch: Partial<Pick<Programme, "name" | "description" | "years">>) => {
+      setState((current) => ({
+        ...current,
+        programmes: current.programmes.map((programme) =>
+          programme.id === programmeId
+            ? { ...programme, ...patch, updatedAt: new Date().toISOString() }
+            : programme,
+        ),
+      }));
     },
     [],
   );
@@ -796,7 +1003,10 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
     () => ({
       state,
       isOffline,
+      syncState,
+      pendingCount,
       createProgramme,
+      updateProgramme,
       renameProgramme,
       updateProgrammeYears,
       deleteProgramme,
@@ -819,7 +1029,10 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
     [
       state,
       isOffline,
+      syncState,
+      pendingCount,
       createProgramme,
+      updateProgramme,
       renameProgramme,
       updateProgrammeYears,
       deleteProgramme,
@@ -859,8 +1072,6 @@ export type {
   LearningOutcome,
   Assessment,
   BackupPayload,
-  PriorityRating,
-  RagStatus,
   CsvModuleImportRow,
   ModuleDeletionImpact,
   BulkModuleDeletionResult,

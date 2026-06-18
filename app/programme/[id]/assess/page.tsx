@@ -3,9 +3,32 @@
 import { useMemo, useState } from "react";
 import { useParams } from "next/navigation";
 import { useAppData, type PriorityRating, type RagStatus } from "@/lib/app-data";
+import { Modal } from "@/components/modal";
 
 const priorities: PriorityRating[] = ["High", "Medium", "Low"];
 const rags: RagStatus[] = ["Red", "Amber", "Green"];
+
+type EditAssessmentState = {
+  open: boolean;
+  id: string;
+  title: string;
+  type: string;
+  description: string;
+  weight: string;
+  priority: PriorityRating | "";
+  rag: RagStatus;
+};
+
+const emptyEdit: EditAssessmentState = {
+  open: false,
+  id: "",
+  title: "",
+  type: "",
+  description: "",
+  weight: "",
+  priority: "",
+  rag: "Amber",
+};
 
 export default function AssessPage() {
   const params = useParams<{ id: string }>();
@@ -15,7 +38,7 @@ export default function AssessPage() {
       : params.id;
   const { state, addAssessment, updateAssessment, deleteAssessment } = useAppData();
   const [drafts, setDrafts] = useState<Record<string, { title: string; rag: RagStatus }>>({});
-
+  const [editState, setEditState] = useState<EditAssessmentState>(emptyEdit);
 
   const modules = state.modules.filter((module) => module.programmeId === programmeId);
   const programme = state.programmes.find((record) => record.id === programmeId);
@@ -51,6 +74,32 @@ export default function AssessPage() {
       assessedLearningOutcomes: new Set(assessments.flatMap((assessment) => assessment.learningOutcomeIds)).size,
     };
   }, [assessments]);
+
+  const openEditAssessment = (assessment: (typeof assessments)[0]) => {
+    setEditState({
+      open: true,
+      id: assessment.id,
+      title: assessment.title,
+      type: assessment.type ?? "",
+      description: assessment.description ?? "",
+      weight: assessment.weight ?? "",
+      priority: assessment.priority ?? "",
+      rag: assessment.rag ?? "Amber",
+    });
+  };
+
+  const handleEditSave = () => {
+    if (!editState.title.trim()) return;
+    updateAssessment(editState.id, {
+      title: editState.title.trim(),
+      type: editState.type.trim(),
+      description: editState.description.trim(),
+      weight: editState.weight.trim(),
+      priority: editState.priority || null,
+      rag: editState.rag,
+    });
+    setEditState(emptyEdit);
+  };
 
   return (
     <div className="space-y-6">
@@ -114,10 +163,30 @@ export default function AssessPage() {
                           <p className="text-sm text-slate-600">{assessment.type || "Type not set"}</p>
                         </div>
                         <div className="flex flex-wrap gap-2">
-                          <span className="rounded-full bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-700">
+                          <span
+                            className={`rounded-full px-2 py-1 text-xs font-semibold ${
+                              assessment.priority === "High"
+                                ? "bg-red-100 text-red-700"
+                                : assessment.priority === "Medium"
+                                  ? "bg-amber-100 text-amber-700"
+                                  : assessment.priority === "Low"
+                                    ? "bg-emerald-100 text-emerald-700"
+                                    : "bg-slate-100 text-slate-700"
+                            }`}
+                          >
                             {assessment.priority ?? "No priority"}
                           </span>
-                          <span className="rounded-full bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-700">
+                          <span
+                            className={`rounded-full px-2 py-1 text-xs font-semibold ${
+                              assessment.rag === "Red"
+                                ? "bg-red-100 text-red-700"
+                                : assessment.rag === "Amber"
+                                  ? "bg-amber-100 text-amber-700"
+                                  : assessment.rag === "Green"
+                                    ? "bg-emerald-100 text-emerald-700"
+                                    : "bg-slate-100 text-slate-700"
+                            }`}
+                          >
                             {assessment.rag ?? "No RAG"}
                           </span>
                         </div>
@@ -128,32 +197,7 @@ export default function AssessPage() {
                           <button
                             type="button"
                             className="rounded-full border border-slate-300 px-3 py-1 text-xs font-semibold text-slate-700"
-                            onClick={() => {
-                              const title = window.prompt("Assessment title", assessment.title);
-                              if (!title?.trim()) {
-                                return;
-                              }
-                              const type = window.prompt("Type", assessment.type) ?? assessment.type;
-                              const description =
-                                window.prompt("Description", assessment.description) ?? assessment.description;
-                              const weight = window.prompt("Weight %", assessment.weight) ?? assessment.weight;
-                              const priority = window.prompt(
-                                "Priority (High/Medium/Low or blank)",
-                                assessment.priority ?? "",
-                              );
-                              const rag = window.prompt("RAG (Red/Amber/Green)", assessment.rag ?? "Amber");
-
-                              updateAssessment(assessment.id, {
-                                title: title.trim(),
-                                type: type.trim(),
-                                description: description.trim(),
-                                weight: weight.trim(),
-                                priority: priorities.includes(priority as PriorityRating)
-                                  ? (priority as PriorityRating)
-                                  : null,
-                                rag: rags.includes(rag as RagStatus) ? (rag as RagStatus) : assessment.rag,
-                              });
-                            }}
+                            onClick={() => openEditAssessment(assessment)}
                           >
                             Edit
                           </button>
@@ -231,6 +275,103 @@ export default function AssessPage() {
           })
         )}
       </section>
+
+      {/* Edit assessment modal */}
+      <Modal
+        open={editState.open}
+        onClose={() => setEditState(emptyEdit)}
+        title="Edit assessment"
+      >
+        <form
+          className="space-y-4"
+          onSubmit={(e) => {
+            e.preventDefault();
+            handleEditSave();
+          }}
+        >
+          <label className="block text-sm font-medium text-slate-700">
+            Title <span className="text-red-500">*</span>
+            <input
+              className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm"
+              value={editState.title}
+              onChange={(e) => setEditState((s) => ({ ...s, title: e.target.value }))}
+              required
+            />
+          </label>
+          <label className="block text-sm font-medium text-slate-700">
+            Type
+            <input
+              className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm"
+              placeholder="e.g. Essay, Exam, Project"
+              value={editState.type}
+              onChange={(e) => setEditState((s) => ({ ...s, type: e.target.value }))}
+            />
+          </label>
+          <label className="block text-sm font-medium text-slate-700">
+            Description
+            <textarea
+              className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm"
+              rows={3}
+              value={editState.description}
+              onChange={(e) => setEditState((s) => ({ ...s, description: e.target.value }))}
+            />
+          </label>
+          <label className="block text-sm font-medium text-slate-700">
+            Weight (%)
+            <input
+              className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm"
+              placeholder="e.g. 40"
+              value={editState.weight}
+              onChange={(e) => setEditState((s) => ({ ...s, weight: e.target.value }))}
+            />
+          </label>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <label className="block text-sm font-medium text-slate-700">
+              Priority
+              <select
+                className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm"
+                value={editState.priority}
+                onChange={(e) => setEditState((s) => ({ ...s, priority: e.target.value as PriorityRating | "" }))}
+              >
+                <option value="">None</option>
+                {priorities.map((p) => (
+                  <option key={p} value={p}>{p}</option>
+                ))}
+              </select>
+            </label>
+            <label className="block text-sm font-medium text-slate-700">
+              RAG status
+              <select
+                className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm"
+                value={editState.rag}
+                onChange={(e) => setEditState((s) => ({ ...s, rag: e.target.value as RagStatus }))}
+              >
+                {rags.map((r) => (
+                  <option key={r} value={r}>{r}</option>
+                ))}
+              </select>
+            </label>
+          </div>
+          <p className="text-xs text-slate-500">
+            🔴 Red — Secure (AI not permitted) · 🟡 Amber — Optional AI use · 🟢 Green — Mandatory AI use
+          </p>
+          <div className="flex justify-end gap-3 pt-2">
+            <button
+              type="button"
+              className="rounded-xl border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:border-slate-400"
+              onClick={() => setEditState(emptyEdit)}
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              className="rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700"
+            >
+              Save changes
+            </button>
+          </div>
+        </form>
+      </Modal>
     </div>
   );
 }

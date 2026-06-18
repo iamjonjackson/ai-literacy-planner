@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import { AppDataProvider } from "@/lib/app-data";
+import { AuthProvider } from "@/lib/auth";
 
 export const metadata: Metadata = {
   title: "AI Literacy Programme Redesign Tool",
@@ -16,7 +17,9 @@ export default function RootLayout({
     return (
       <html lang="en" className="h-full antialiased">
         <body className="min-h-full">
-          <AppDataProvider>{children}</AppDataProvider>
+          <AuthProvider>
+            <AppDataProvider>{children}</AppDataProvider>
+          </AuthProvider>
         </body>
       </html>
     );

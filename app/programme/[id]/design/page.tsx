@@ -5,6 +5,13 @@ import { useParams } from "next/navigation";
 import { frameworkCompetencies, findDimension } from "@/lib/framework";
 import { useAppData } from "@/lib/app-data";
 import { usePersistentState } from "@/lib/persistent-state";
+import { Modal } from "@/components/modal";
+
+type EditLoState = {
+  open: boolean;
+  loId: string;
+  text: string;
+};
 
 export default function DesignPage() {
   const params = useParams<{ id: string }>();
@@ -18,7 +25,7 @@ export default function DesignPage() {
     frameworkCompetencies[0].id,
   );
   const [draft, setDraft] = useState("");
-
+  const [editLo, setEditLo] = useState<EditLoState>({ open: false, loId: "", text: "" });
 
   const learningOutcomes = state.learningOutcomes.filter((learningOutcome) => learningOutcome.programmeId === programmeId);
   const programme = state.programmes.find((record) => record.id === programmeId);
@@ -34,6 +41,16 @@ export default function DesignPage() {
     [learningOutcomes, selectedCompetencyId],
   );
   const unassignedOutcomes = learningOutcomes.filter((learningOutcome) => !learningOutcome.competencyId);
+
+  const openEditLo = (loId: string, text: string) => {
+    setEditLo({ open: true, loId, text });
+  };
+
+  const handleEditSave = () => {
+    if (editLo.text.trim().length < 10) return;
+    updateLearningOutcome(editLo.loId, { text: editLo.text.trim() });
+    setEditLo({ open: false, loId: "", text: "" });
+  };
 
   return (
     <div className="space-y-6">
@@ -91,7 +108,6 @@ export default function DesignPage() {
                             <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{competency.id}</p>
                             <p className="text-sm font-semibold text-slate-900">{competency.title}</p>
                           </div>
-                          {/* if {count} > 0 change to green pill */}
                           <span
                             className={`inline-block rounded-full px-2 py-1 text-xs font-semibold ${
                               count > 0 ? "bg-emerald-100 text-emerald-700" : "bg-slate-100 text-slate-700"
@@ -148,12 +164,7 @@ export default function DesignPage() {
                         <button
                           type="button"
                           className="rounded-full border border-slate-300 px-3 py-1 font-semibold text-slate-700"
-                          onClick={() => {
-                            const nextText = window.prompt("Edit imported LO", learningOutcome.text);
-                            if (nextText && nextText.trim().length >= 10) {
-                              updateLearningOutcome(learningOutcome.id, { text: nextText.trim() });
-                            }
-                          }}
+                          onClick={() => openEditLo(learningOutcome.id, learningOutcome.text)}
                         >
                           Edit
                         </button>
@@ -222,12 +233,7 @@ export default function DesignPage() {
                       <button
                         type="button"
                         className="rounded-full border border-slate-300 px-3 py-1 text-xs font-semibold text-slate-700"
-                        onClick={() => {
-                          const nextText = window.prompt("Edit LO", learningOutcome.text);
-                          if (nextText && nextText.trim().length >= 10) {
-                            updateLearningOutcome(learningOutcome.id, { text: nextText.trim() });
-                          }
-                        }}
+                        onClick={() => openEditLo(learningOutcome.id, learningOutcome.text)}
                       >
                         Edit
                       </button>
@@ -292,6 +298,52 @@ export default function DesignPage() {
           )}
         </section>
       </div>
+
+      {/* Edit LO modal */}
+      <Modal
+        open={editLo.open}
+        onClose={() => setEditLo({ open: false, loId: "", text: "" })}
+        title="Edit learning outcome"
+      >
+        <form
+          className="space-y-4"
+          onSubmit={(e) => {
+            e.preventDefault();
+            handleEditSave();
+          }}
+        >
+          <label className="block text-sm font-medium text-slate-700">
+            Learning outcome text
+            <textarea
+              className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm"
+              rows={4}
+              minLength={10}
+              value={editLo.text}
+              onChange={(e) => setEditLo((s) => ({ ...s, text: e.target.value }))}
+              required
+            />
+            {editLo.text.trim().length > 0 && editLo.text.trim().length < 10 ? (
+              <p className="mt-1 text-xs text-red-600">Minimum 10 characters required.</p>
+            ) : null}
+          </label>
+          <div className="flex justify-end gap-3 pt-2">
+            <button
+              type="button"
+              className="rounded-xl border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:border-slate-400"
+              onClick={() => setEditLo({ open: false, loId: "", text: "" })}
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={editLo.text.trim().length < 10}
+              className="rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-60"
+            >
+              Save changes
+            </button>
+          </div>
+        </form>
+      </Modal>
     </div>
   );
 }
