@@ -230,7 +230,7 @@ export default function DashboardPage() {
                     <dd className="mt-2 text-lg font-semibold text-slate-900">{counts?.coverage ?? 0}%</dd>
                   </div>
                 </dl>
-                <div className="mt-6 flex flex-wrap gap-2">
+                <div className="mt-6 flex flex-wrap gap-2 text-white">
                   <Link
                     href={buildProgrammeRoute(programme.id, "explore")}
                     className="rounded-full bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700"

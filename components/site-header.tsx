@@ -29,7 +29,7 @@ export function SiteHeader() {
           <Link href="/dashboard" className="text-lg font-semibold text-slate-900">
             AI Literacy Programme Redesign Tool
           </Link>
-          <p className="text-sm text-slate-600">AI literacy planning workspace.</p>
+          {/* <p className="text-sm text-slate-600">AI literacy planning workspace.</p> */}
         </div>
         <nav className="flex items-center gap-3 text-sm font-medium text-slate-600">
           <span
