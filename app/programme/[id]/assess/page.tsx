@@ -208,7 +208,7 @@ function AssessPageContent() {
                             <div className="flex flex-wrap items-start justify-between gap-2">
                               <div>
                                 <h3 className="font-semibold text-slate-900">{assessment.title}</h3>
-                                <p className="text-sm text-slate-600">{assessment.type || "Type not set"}</p>
+                                <p className="text-sm text-slate-600">{assessment.type || "Type not set"} · {assessment.weight}</p>
                               </div>
                               <div className="flex flex-wrap gap-2">
                                 <span
@@ -235,7 +235,7 @@ function AssessPageContent() {
                                           : "bg-slate-100 text-slate-700"
                                   }`}
                                 >
-                                  {assessment.rag ?? "Missing AI and Assessment taxonomy"}
+                                  {assessment.rag === "" ? "Missing AI taxonomy" : assessment.rag}
                                 </span>
                               </div>
                             </div>
