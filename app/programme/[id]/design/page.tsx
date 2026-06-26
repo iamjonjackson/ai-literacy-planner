@@ -72,7 +72,7 @@ export default function DesignPage() {
         </div>
       </section>
 
-      <div className="grid gap-6 lg:grid-cols-[320px_minmax(0,1fr)]">
+      <div className="grid gap-6 lg:grid-cols-[320px_minmax(0,1fr)] ">
         <section className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm">
           <h3 className="text-sm font-semibold uppercase tracking-[0.2em] text-slate-500">AI Competencies</h3>
           <div className="mt-3 space-y-4">
@@ -124,64 +124,7 @@ export default function DesignPage() {
             })}
           </div>
 
-          <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-3">
-            <h4 className="text-xs font-semibold uppercase tracking-wide text-slate-500">Unassigned — Imported LOs</h4>
-            <div className="mt-2 space-y-2">
-              {unassignedOutcomes.length === 0 ? (
-                <p className="text-xs text-slate-500">None</p>
-              ) : (
-                unassignedOutcomes.map((learningOutcome) => (
-                  <article
-                    key={learningOutcome.id}
-                    className="rounded-lg border border-slate-200 bg-white px-3 py-3 text-xs text-slate-700"
-                  >
-                    <div className="flex flex-wrap gap-2">
-                      {learningOutcome.category ? (
-                        <span className="rounded-full bg-slate-100 px-2 py-1 font-semibold text-slate-600">
-                          {learningOutcome.category}
-                        </span>
-                      ) : null}
-                      {learningOutcome.loNumber ? (
-                        <span className="rounded-full bg-slate-100 px-2 py-1 font-semibold text-slate-600">
-                          LO {learningOutcome.loNumber}
-                        </span>
-                      ) : null}
-                    </div>
-                    <p className="mt-2 leading-5">{learningOutcome.text}</p>
-                    {!isViewer ? (
-                      <div className="mt-3 flex flex-wrap gap-2">
-                        <button
-                          type="button"
-                          className="rounded-full bg-blue-600 px-3 py-1 font-semibold text-white hover:bg-blue-700"
-                          onClick={() =>
-                            updateLearningOutcome(learningOutcome.id, {
-                              competencyId: selectedCompetencyId,
-                            })
-                          }
-                        >
-                          Assign to {selectedCompetencyId}
-                        </button>
-                        <button
-                          type="button"
-                          className="rounded-full border border-slate-300 px-3 py-1 font-semibold text-slate-700"
-                          onClick={() => openEditLo(learningOutcome.id, learningOutcome.text)}
-                        >
-                          Edit
-                        </button>
-                        <button
-                          type="button"
-                          className="rounded-full border border-red-200 px-3 py-1 font-semibold text-red-700"
-                          onClick={() => deleteLearningOutcome(learningOutcome.id)}
-                        >
-                          Delete
-                        </button>
-                      </div>
-                    ) : null}
-                  </article>
-                ))
-              )}
-            </div>
-          </div>
+          
         </section>
 
         <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
@@ -296,7 +239,69 @@ export default function DesignPage() {
               Viewer access is read-only. Learning outcomes can be reviewed but not edited.
             </p>
           )}
+
         </section>
+{/* 
+        <aside className="rounded-3xl border border-slate-200 bg-slate-50 p-4 shadow-sm">
+          <h4 className="text-xs font-semibold uppercase tracking-wide text-slate-500">Unassigned — Imported LOs</h4>
+          <div className="mt-3 space-y-2">
+            {unassignedOutcomes.length === 0 ? (
+              <p className="text-xs text-slate-500">None</p>
+            ) : (
+              unassignedOutcomes.map((learningOutcome) => (
+                <article
+                  key={learningOutcome.id}
+                  className="rounded-lg border border-slate-200 bg-white px-3 py-3 text-xs text-slate-700"
+                >
+                  <div className="flex flex-wrap gap-2">
+                    {learningOutcome.category ? (
+                      <span className="rounded-full bg-slate-100 px-2 py-1 font-semibold text-slate-600">
+                        {learningOutcome.category}
+                      </span>
+                    ) : null}
+                    {learningOutcome.loNumber ? (
+                      <span className="rounded-full bg-slate-100 px-2 py-1 font-semibold text-slate-600">
+                        LO {learningOutcome.loNumber}
+                      </span>
+                    ) : null}
+                  </div>
+                  <p className="mt-2 leading-5">{learningOutcome.text}</p>
+                  {!isViewer ? (
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        className="rounded-full bg-blue-600 px-3 py-1 font-semibold text-white hover:bg-blue-700"
+                        onClick={() =>
+                          updateLearningOutcome(learningOutcome.id, {
+                            competencyId: selectedCompetencyId,
+                          })
+                        }
+                      >
+                        Assign to {selectedCompetencyId}
+                      </button>
+                      <button
+                        type="button"
+                        className="rounded-full border border-slate-300 px-3 py-1 font-semibold text-slate-700"
+                        onClick={() => openEditLo(learningOutcome.id, learningOutcome.text)}
+                      >
+                        Edit
+                      </button>
+                      <button
+                        type="button"
+                        className="rounded-full border border-red-200 px-3 py-1 font-semibold text-red-700"
+                        onClick={() => deleteLearningOutcome(learningOutcome.id)}
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  ) : null}
+                </article>
+              ))
+            )}
+          </div>
+        </aside> */}
+
+
       </div>
 
       {/* Edit LO modal */}

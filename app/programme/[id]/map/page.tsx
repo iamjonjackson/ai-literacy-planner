@@ -220,7 +220,8 @@ export default function MapPage() {
                     return (
                       <span key={learningOutcome.id} className="rounded-full bg-blue-50 px-3 py-1 text-xs text-blue-700">
                         {/* {competency?.id ?? "Imported"}:  */}
-                        {learningOutcome.text.slice(0, 80)}
+                        {/* {learningOutcome.text.slice(0, 80)} */}
+                        {learningOutcome.text}
                       </span>
                     );
                   })}
@@ -239,7 +240,7 @@ export default function MapPage() {
             <p className="text-sm text-slate-500">No learning outcomes yet.</p>
           ) : (
             learningOutcomes.map((learningOutcome) => {
-              const competency = frameworkCompetencies.find((record) => record.id === learningOutcome.competencyId);
+              // const competency = frameworkCompetencies.find((record) => record.id === learningOutcome.competencyId);
 
               return (
                 <article

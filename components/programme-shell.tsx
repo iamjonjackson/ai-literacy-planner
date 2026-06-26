@@ -36,12 +36,7 @@ export function ProgrammeShell({ programmeId, children }: ProgrammeShellProps) {
               </div>
             </div>
             <div className="flex flex-wrap items-center gap-3 text-sm">
-              <Link
-                href="/dashboard"
-                className="rounded-full border border-slate-200 px-4 py-2 font-medium text-slate-600 hover:border-slate-300 hover:text-slate-900"
-              >
-                All programmes
-              </Link>
+
               {programme?.role === "owner" ? (
                 <button
                   type="button"
@@ -54,9 +49,9 @@ export function ProgrammeShell({ programmeId, children }: ProgrammeShellProps) {
               <span className="rounded-full bg-slate-100 px-4 py-2 font-medium text-slate-700">
                 {programme?.role ?? "owner"}
               </span>
-              <span className="rounded-full bg-emerald-50 px-4 py-2 font-medium text-emerald-700">
+              {/* <span className="rounded-full bg-emerald-50 px-4 py-2 font-medium text-emerald-700">
                 {isOffline ? "Offline" : "Synced"}
-              </span>
+              </span> */}
             </div>
           </div>
           {programme?.role === "viewer" ? (

@@ -128,7 +128,7 @@ function addAssessmentSummary(doc: jsPDF, startY: number, data: ExportData): num
 
   autoTable(doc, {
     startY,
-    head: [["RAG Status", "Count"]],
+    head: [["AI and Assessment taxonomy", "Count"]],
     body: Object.entries(ragCounts).map(([k, v]) => [k, String(v)]),
     styles: { fontSize: 9 },
     headStyles: { fillColor: BRAND_BLUE },

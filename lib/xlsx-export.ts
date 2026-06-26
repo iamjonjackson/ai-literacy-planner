@@ -52,7 +52,7 @@ function coverageStatsRows(data: ExportData) {
 
   return [
     ...Object.entries(ragCounts).map(([status, count]) => ({
-      Category: "RAG Status",
+      Category: "AI and Assessment taxonomy",
       Label: status,
       Count: count,
     })),
@@ -73,7 +73,7 @@ function assessmentSummaryRows(data: ExportData) {
       Type: a.type || "",
       "Weight (%)": a.weight || "",
       Priority: a.priority || "",
-      "RAG Status": a.rag || "",
+      "AI and Assessment taxonomy": a.rag || "",
       Module: mod?.name || "",
       "Module Code": mod?.code || "",
       "Year": mod?.year ?? "",

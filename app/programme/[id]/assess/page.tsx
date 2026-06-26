@@ -111,13 +111,18 @@ export default function AssessPage() {
         <article className="rounded-2xl bg-slate-50 p-4">
           <p className="text-xs uppercase tracking-wide text-slate-500">Priority</p>
           <p className="mt-2 text-sm text-slate-700">
-            H {summary.byPriority.High} · M {summary.byPriority.Medium} · L {summary.byPriority.Low}
+            {summary.byPriority.High} High<br />
+            {summary.byPriority.Medium} Medium<br />
+            {summary.byPriority.Low} Low<br />
+            {summary.total - summary.byPriority.High - summary.byPriority.Medium - summary.byPriority.Low} No action required
           </p>
         </article>
         <article className="rounded-2xl bg-slate-50 p-4">
-          <p className="text-xs uppercase tracking-wide text-slate-500">RAG status</p>
+          <p className="text-xs uppercase tracking-wide text-slate-500">AI and Assessment taxonomy</p>
           <p className="mt-2 text-sm text-slate-700">
-            R {summary.byRag.Red} · A {summary.byRag.Amber} · G {summary.byRag.Green}
+            🔴 {summary.byRag.Red} (Secure, No AI)<br />
+            🟡 {summary.byRag.Amber} (Optional AI)<br />
+            🟢 {summary.byRag.Green} (Mandatory AI)
           </p>
         </article>
         <article className="rounded-2xl bg-slate-50 p-4">
@@ -187,7 +192,7 @@ export default function AssessPage() {
                                     : "bg-slate-100 text-slate-700"
                             }`}
                           >
-                            {assessment.rag ?? "No RAG"}
+                            {assessment.rag ?? "Missing AI and Assessment taxonomy"}
                           </span>
                         </div>
                       </div>
@@ -333,14 +338,14 @@ export default function AssessPage() {
                 value={editState.priority}
                 onChange={(e) => setEditState((s) => ({ ...s, priority: e.target.value as PriorityRating | "" }))}
               >
-                <option value="">None</option>
+                <option value="">No action required</option>
                 {priorities.map((p) => (
                   <option key={p} value={p}>{p}</option>
                 ))}
               </select>
             </label>
             <label className="block text-sm font-medium text-slate-700">
-              RAG status
+              AI and Assessment taxonomy 
               <select
                 className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm"
                 value={editState.rag}
