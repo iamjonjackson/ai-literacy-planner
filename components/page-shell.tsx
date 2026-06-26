@@ -1,5 +1,6 @@
 import { ReactNode } from "react";
 import { SiteHeader } from "@/components/site-header";
+import { Footer } from "./footer";
 
 type PageShellProps = {
   children: ReactNode;
@@ -11,6 +12,7 @@ export function PageShell({ children }: PageShellProps) {
       <SiteHeader />
       <main className="mx-auto flex w-full max-w-7xl flex-col gap-8 px-6 py-8">
         {children}
+        <Footer />
       </main>
     </div>
   );
