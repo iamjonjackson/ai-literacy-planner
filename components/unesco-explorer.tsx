@@ -1,0 +1,261 @@
+"use client";
+
+import { useMemo } from "react";
+import { findDimension, frameworkCompetencies, frameworkDimensions } from "@/lib/framework";
+import { usePersistentState } from "@/lib/persistent-state";
+
+const references = [
+  {
+    label: "Corbin, T. et al. (2025) ‘The wicked problem of AI and assessment’, Assessment & Evaluation in Higher Education. Available at: https://doi.org/10.1080/02602938.2025.2553340.",
+    href: "https://doi.org/10.1080/02602938.2025.2553340",
+  },
+  {
+    label: "Corbin, T., Dawson, P. and Liu, D. (2025) ‘Talk is cheap: why structural assessment changes are needed for a time of GenAI’, Assessment & Evaluation in Higher Education, 50(7), pp. 1087–1097.",
+    href: "https://www.tandfonline.com/doi/abs/10.1080/02602938.2025.2503964",
+  },
+  {
+    label: "Hamilton, D., Hansen, L. and Dawson, P. (2025) ‘Curriculum-wide recommendations for a people and a world to come’. Deakin University. Available at: https://doi.org/10.26187/DEAKIN.26074075.V1.",
+    href: "https://doi.org/10.26187/DEAKIN.26074075.V1",
+  },
+  {
+    label:
+      "Nicola-Richmond, K. et al. (2026) ‘Implementing a collaborative program-wide approach to redeveloping assessment in response to generative artificial intelligence (GenAI)’, Assessment & Evaluation in Higher Education, 0(0), pp. 1–17. Available at: https://doi.org/10.1080/02602938.2026.2653886.",
+    href: "https://doi.org/10.1080/02602938.2026.2653886",
+  },
+  {
+    label: "Russell Group Principles on the use of generative AI tools in education",
+    href: "https://www.russellgroup.ac.uk/policy/policy-briefings/principles-use-generative-ai-tools-education",
+  },
+  {
+    label: "UNESCO AI Competency Framework for Students",
+    href: "https://www.unesco.org/en/articles/ai-competency-framework-students",
+  },
+];
+
+type Level = "understand" | "apply" | "create";
+
+type UnescoExplorerProps = {
+  stateScope: string;
+};
+
+export function UnescoExplorer({ stateScope }: UnescoExplorerProps) {
+  const stateKey = `ai-literacy-planner:explore:${stateScope}`;
+  const [search, setSearch] = usePersistentState(`${stateKey}:search`, "");
+  const [selectedDimension, setSelectedDimension] = usePersistentState(
+    `${stateKey}:dimension`,
+    frameworkDimensions[0].id,
+  );
+  const [selectedCompetencyId, setSelectedCompetencyId] = usePersistentState(
+    `${stateKey}:competency`,
+    frameworkCompetencies[0].id,
+  );
+  const [selectedLevel, setSelectedLevel] = usePersistentState<Level>(`${stateKey}:level`, "understand");
+  const [showGrid, setShowGrid] = usePersistentState(`${stateKey}:grid`, false);
+
+  const filteredCompetencies = useMemo(() => {
+    const query = search.trim().toLowerCase();
+    if (!query) {
+      return frameworkCompetencies;
+    }
+
+    return frameworkCompetencies.filter((competency) => {
+      return (
+        competency.title.toLowerCase().includes(query) ||
+        competency.id.includes(query) ||
+        competency.narrative?.toLowerCase().includes(query) ||
+        competency.levels.understand?.toLowerCase().includes(query) ||
+        competency.levels.apply?.toLowerCase().includes(query) ||
+        competency.levels.create?.toLowerCase().includes(query)
+      );
+    });
+  }, [search]);
+
+  const visibleCompetencies = filteredCompetencies.filter(
+    (competency) => competency.dimensionId === selectedDimension,
+  );
+
+  const selectedCompetency =
+    filteredCompetencies.find((competency) => competency.id === selectedCompetencyId) ??
+    filteredCompetencies[0] ??
+    frameworkCompetencies[0];
+  const selectedDimensionRecord = findDimension(selectedCompetency.dimensionId);
+  const availableLevels = (["understand", "apply", "create"] as const).filter((level) =>
+    selectedCompetency.levels[level]?.trim(),
+  );
+  const resolvedSelectedLevel =
+    availableLevels.find((level) => level === selectedLevel) ?? availableLevels[0] ?? "understand";
+
+  return (
+    <div className="grid gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(280px,1fr)]">
+      <section className="space-y-4 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+        <div className="flex flex-wrap items-center gap-3">
+          <input
+            className="min-w-[240px] flex-1 rounded-xl border border-slate-200 px-4 py-2 text-sm"
+            placeholder="Search competencies and descriptors"
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+          />
+          <button
+            type="button"
+            className="rounded-xl border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700"
+            onClick={() => setShowGrid((current) => !current)}
+          >
+            {showGrid ? "Show detail" : "Show 4×3 grid"}
+          </button>
+        </div>
+
+        {!showGrid && (
+          <div className="flex flex-wrap gap-2">
+            {frameworkDimensions.map((dimension) => (
+              <button
+                key={dimension.id}
+                type="button"
+                className={`rounded-full px-4 py-2 text-sm font-medium ${
+                  selectedDimension === dimension.id ? "bg-blue-600 text-white" : "bg-slate-100 text-slate-700"
+                }`}
+                onClick={() => {
+                  setSelectedDimension(dimension.id);
+                  const firstCompetencyInDimension = filteredCompetencies.find(
+                    (competency) => competency.dimensionId === dimension.id,
+                  );
+                  if (firstCompetencyInDimension) {
+                    setSelectedCompetencyId(firstCompetencyInDimension.id);
+                    const nextAvailableLevels = (["understand", "apply", "create"] as const).filter(
+                      (level) => firstCompetencyInDimension.levels[level]?.trim(),
+                    );
+                    setSelectedLevel(nextAvailableLevels[0] ?? "understand");
+                  }
+                }}
+              >
+                {dimension.label}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {showGrid ? (
+          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+            {["understand", "apply", "create"].map((level) => (
+                <span
+                    key={level}
+                    className="rounded-full text-center px-2 py-1 text-xs font-semibold uppercase tracking-wide bg-blue-600 text-white"
+                >
+                    {level.charAt(0).toUpperCase() + level.slice(1)}
+                </span>
+            ))}
+
+            {filteredCompetencies.map((competency) => {
+              const dimension = findDimension(competency.dimensionId);
+              return (
+                <button
+                  key={competency.id}
+                  type="button"
+                  className="rounded-2xl border border-slate-200 p-4 text-left hover:border-blue-300"
+                  onClick={() => {
+                    setSelectedCompetencyId(competency.id);
+                    setShowGrid(false);
+                    setSelectedDimension(competency.dimensionId);
+                  }}
+                >
+                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{competency.id}</p>
+                  <h3 className="mt-2 text-sm font-semibold text-slate-900">{competency.title}</h3>
+                  <span
+                    className={`mt-3 inline-block rounded-full px-2 py-1 text-xs font-semibold ${dimension?.colorClass}`}
+                  >
+                    {dimension?.label}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        ) : (
+          <div className="grid gap-4 lg:grid-cols-[280px_minmax(0,1fr)]">
+            <div className="space-y-2 rounded-2xl bg-slate-50 p-3">
+              {visibleCompetencies.map((competency) => (
+                <button
+                  key={competency.id}
+                  type="button"
+                  className={`w-full rounded-xl border px-3 py-2 text-left ${
+                    selectedCompetency.id === competency.id
+                      ? "border-blue-500 bg-blue-50"
+                      : "border-slate-200 bg-white hover:border-slate-300"
+                  }`}
+                  onClick={() => {
+                    setSelectedCompetencyId(competency.id);
+                    const nextAvailableLevels = (["understand", "apply", "create"] as const).filter(
+                      (level) => competency.levels[level]?.trim(),
+                    );
+                    setSelectedLevel(nextAvailableLevels[0] ?? "understand");
+                  }}
+                >
+                  <p className="text-xs text-slate-500">{competency.id}</p>
+                  <p className="text-sm font-medium text-slate-900">{competency.title}</p>
+                  <div className="mt-2 flex flex-wrap gap-1">
+                    {(["understand", "apply", "create"] as const).map((level) => {
+                      if (!competency.levels[level]?.trim()) {
+                        return null;
+                      }
+                      return (
+                        <span
+                          key={level}
+                          className={`rounded-full px-2 py-1 text-xs font-semibold uppercase tracking-wide ${
+                            resolvedSelectedLevel === level ? "bg-blue-600 text-white" : "bg-slate-100 text-slate-700"
+                          }`}
+                        >
+                          {level}
+                        </span>
+                      );
+                    })}
+                  </div>
+                </button>
+              ))}
+            </div>
+            <article className="rounded-2xl border border-slate-200 p-5">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div>
+                  <p className="text-sm font-medium text-slate-500">{selectedCompetency.id}</p>
+                  <h2 className="text-2xl font-semibold text-slate-900">{selectedCompetency.title}</h2>
+                </div>
+                <span
+                  className={`rounded-full px-3 py-1 text-xs font-semibold ${selectedDimensionRecord?.colorClass}`}
+                >
+                  {selectedDimensionRecord?.label}
+                </span>
+              </div>
+              <div className="mt-4 flex flex-wrap gap-2">
+                {availableLevels.map((level) => (
+                  <button
+                    key={level}
+                    type="button"
+                    className={`rounded-full px-3 py-1.5 text-xs font-semibold uppercase tracking-wide ${
+                      resolvedSelectedLevel === level ? "bg-blue-600 text-white" : "bg-slate-100 text-slate-700"
+                    }`}
+                    onClick={() => setSelectedLevel(level)}
+                  >
+                    {level}
+                  </button>
+                ))}
+              </div>
+              <p className="mt-4 rounded-xl bg-slate-50 p-4 text-sm text-slate-700">
+                {selectedCompetency.levels[resolvedSelectedLevel]}
+              </p>
+              <p className="mt-4 text-sm leading-7 text-slate-700">{selectedCompetency.narrative}</p>
+            </article>
+          </div>
+        )}
+      </section>
+      <aside className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+        <h3 className="text-lg font-semibold text-slate-900">References and reading</h3>
+        <ul className="mt-4 space-y-3 text-sm text-slate-700">
+          {references.map((reference) => (
+            <li className="ml-5 list-disc" key={reference.href}>
+              <a className="text-blue-700 underline" href={reference.href} target="_blank" rel="noreferrer">
+                {reference.label}
+              </a>
+            </li>
+          ))}
+        </ul>
+      </aside>
+    </div>
+  );
+}
