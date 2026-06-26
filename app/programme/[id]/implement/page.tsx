@@ -1,18 +1,16 @@
 "use client";
 
-import { useRef } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { Suspense, useRef } from "react";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useAppData } from "@/lib/app-data";
 import { buildProgrammeRoute } from "@/lib/programme";
 import { downloadSummaryPdf, downloadFullDetailPdf } from "@/lib/pdf-export";
 import { downloadSummaryXlsx, downloadFullDetailXlsx } from "@/lib/xlsx-export";
 
-export default function ImplementPage() {
+function ImplementPageContent() {
   const params = useParams<{ id: string }>();
-  const programmeId =
-    typeof window !== "undefined"
-      ? new URLSearchParams(window.location.search).get("programme") ?? params.id
-      : params.id;
+  const searchParams = useSearchParams();
+  const programmeId = searchParams.get("programme") ?? params.id;
   const router = useRouter();
   const importRef = useRef<HTMLInputElement>(null);
   const { state, exportProgrammeBackup, importProgrammeBackup } = useAppData();
@@ -207,5 +205,13 @@ export default function ImplementPage() {
         </dl>
       </aside>
     </div>
+  );
+}
+
+export default function ImplementPage() {
+  return (
+    <Suspense fallback={null}>
+      <ImplementPageContent />
+    </Suspense>
   );
 }

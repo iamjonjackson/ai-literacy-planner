@@ -1,8 +1,7 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
-import { useParams } from "next/navigation";
-import { frameworkCompetencies } from "@/lib/framework";
+import { Suspense, useMemo, useRef, useState } from "react";
+import { useParams, useSearchParams } from "next/navigation";
 import { useAppData } from "@/lib/app-data";
 import { parseCsvFile, type CsvPreviewRow, type CsvSkippedRow, type CsvParseResult } from "@/lib/csv-import";
 
@@ -14,12 +13,10 @@ type ImportState =
 
 const BATCH_SIZE = 10;
 
-export default function MapPage() {
+function MapPageContent() {
   const params = useParams<{ id: string }>();
-  const programmeId =
-    typeof window !== "undefined"
-      ? new URLSearchParams(window.location.search).get("programme") ?? params.id
-      : params.id;
+  const searchParams = useSearchParams();
+  const programmeId = searchParams.get("programme") ?? params.id;
   const { state, updateLearningOutcome, importCsvModules } = useAppData();
   const csvInputRef = useRef<HTMLInputElement>(null);
   const [importState, setImportState] = useState<ImportState>({ stage: "idle" });
@@ -38,20 +35,15 @@ export default function MapPage() {
   const mapped = newLearningOutcomes.filter((learningOutcome) => learningOutcome.moduleId).length;
   const mappingCoverage = newLearningOutcomes.length ? Math.round((mapped / newLearningOutcomes.length) * 100) : 0;
 
-  const outcomesByModule = useMemo(() => {
-    const grouped = new Map<string, typeof learningOutcomes>();
-    learningOutcomes.forEach((learningOutcome) => {
-      if (!learningOutcome.moduleId) {
-        return;
-      }
+  const outcomesByModule = new Map<string, typeof learningOutcomes>();
+  learningOutcomes.forEach((learningOutcome) => {
+    if (!learningOutcome.moduleId) {
+      return;
+    }
 
-      const list = grouped.get(learningOutcome.moduleId) ?? [];
-      list.push(learningOutcome);
-      grouped.set(learningOutcome.moduleId, list);
-    });
-
-    return grouped;
-  }, [learningOutcomes]);
+    const list = outcomesByModule.get(learningOutcome.moduleId) ?? [];
+    outcomesByModule.set(learningOutcome.moduleId, [...list, learningOutcome]);
+  });
 
   const existingCodes = useMemo(
     () => new Set(modules.map((m) => m.code).filter(Boolean)),
@@ -238,6 +230,8 @@ export default function MapPage() {
                                 // const competency = frameworkCompetencies.find(
                                 //   (record) => record.id === learningOutcome.competencyId,
                                 // );
+                                //TODO: if LO has an AI unesco competency, show LO with a green border.
+
                                 return (
                                   <span key={learningOutcome.id} className="text-xs text-blue-700">
                                     {/* {competency?.id ?? "Imported"}:  */}
@@ -316,6 +310,14 @@ export default function MapPage() {
         </div>
       </aside>
     </div>
+  );
+}
+
+export default function MapPage() {
+  return (
+    <Suspense fallback={null}>
+      <MapPageContent />
+    </Suspense>
   );
 }
 

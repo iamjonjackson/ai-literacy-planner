@@ -1,7 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { useParams } from "next/navigation";
+import { Suspense, useMemo, useState } from "react";
+import { useParams, useSearchParams } from "next/navigation";
 import { frameworkCompetencies, findDimension } from "@/lib/framework";
 import { useAppData } from "@/lib/app-data";
 import { usePersistentState } from "@/lib/persistent-state";
@@ -16,12 +16,10 @@ type EditLoState = {
 
 const loCategories = ["Disciplinary Skills", "Academic Content", "Attributes"] as const;
 
-export default function DesignPage() {
+function DesignPageContent() {
   const params = useParams<{ id: string }>();
-  const programmeId =
-    typeof window !== "undefined"
-      ? new URLSearchParams(window.location.search).get("programme") ?? params.id
-      : params.id;
+  const searchParams = useSearchParams();
+  const programmeId = searchParams.get("programme") ?? params.id;
   const { state, addLearningOutcome, updateLearningOutcome, deleteLearningOutcome } = useAppData();
   const [selectedCompetencyId, setSelectedCompetencyId] = usePersistentState(
     `ai-literacy-planner:design:${programmeId}:competency`,
@@ -378,5 +376,13 @@ export default function DesignPage() {
         </form>
       </Modal>
     </div>
+  );
+}
+
+export default function DesignPage() {
+  return (
+    <Suspense fallback={null}>
+      <DesignPageContent />
+    </Suspense>
   );
 }

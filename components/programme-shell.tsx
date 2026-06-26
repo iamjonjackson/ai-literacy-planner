@@ -1,7 +1,7 @@
 "use client";
 
 import { ReactNode, useState } from "react";
-import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { PageShell } from "@/components/page-shell";
 import { ProgrammeTabs } from "@/components/programme-tabs";
 import { ShareModal } from "@/components/share-modal";
@@ -15,11 +15,9 @@ type ProgrammeShellProps = {
 };
 
 export function ProgrammeShell({ programmeId, children }: ProgrammeShellProps) {
-  const resolvedProgrammeId =
-    typeof window !== "undefined"
-      ? new URLSearchParams(window.location.search).get("programme") ?? programmeId
-      : programmeId;
-  const { state, isOffline } = useAppData();
+  const searchParams = useSearchParams();
+  const resolvedProgrammeId = searchParams.get("programme") ?? programmeId;
+  const { state } = useAppData();
   const programme = state.programmes.find((record) => record.id === resolvedProgrammeId);
   const programmeName = programme?.name ?? formatProgrammeName(resolvedProgrammeId);
   const [shareOpen, setShareOpen] = useState(false);

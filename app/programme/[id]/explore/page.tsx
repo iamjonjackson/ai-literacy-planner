@@ -1,14 +1,21 @@
 "use client";
 
-import { useParams } from "next/navigation";
+import { Suspense } from "react";
+import { useParams, useSearchParams } from "next/navigation";
 import { UnescoExplorer } from "@/components/unesco-explorer";
 
-export default function ExplorePage() {
+function ExplorePageContent() {
   const params = useParams<{ id: string }>();
-  const programmeId =
-    typeof window !== "undefined"
-      ? new URLSearchParams(window.location.search).get("programme") ?? params.id
-      : params.id;
+  const searchParams = useSearchParams();
+  const programmeId = searchParams.get("programme") ?? params.id;
 
   return <UnescoExplorer stateScope={programmeId} />;
+}
+
+export default function ExplorePage() {
+  return (
+    <Suspense fallback={null}>
+      <ExplorePageContent />
+    </Suspense>
+  );
 }

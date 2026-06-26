@@ -171,12 +171,20 @@ export async function saveAllToIdb(state: {
     ["programmes", "modules", "learning_outcomes", "assessments"],
     "readwrite",
   );
+  const programmesStore = tx.objectStore("programmes");
+  const modulesStore = tx.objectStore("modules");
+  const outcomesStore = tx.objectStore("learning_outcomes");
+  const assessmentsStore = tx.objectStore("assessments");
 
   await Promise.all([
-    ...state.programmes.map((r) => tx.objectStore("programmes").put(r)),
-    ...state.modules.map((r) => tx.objectStore("modules").put(r)),
-    ...state.learningOutcomes.map((r) => tx.objectStore("learning_outcomes").put(r)),
-    ...state.assessments.map((r) => tx.objectStore("assessments").put(r)),
+    programmesStore.clear(),
+    modulesStore.clear(),
+    outcomesStore.clear(),
+    assessmentsStore.clear(),
+    ...state.programmes.map((r) => programmesStore.put(r)),
+    ...state.modules.map((r) => modulesStore.put(r)),
+    ...state.learningOutcomes.map((r) => outcomesStore.put(r)),
+    ...state.assessments.map((r) => assessmentsStore.put(r)),
     tx.done,
   ]);
 }

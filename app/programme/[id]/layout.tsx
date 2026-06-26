@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { Suspense, type ReactNode } from "react";
 import { ProgrammeShell } from "@/components/programme-shell";
 import { getStaticProgrammeParams } from "@/lib/programme";
 
@@ -17,5 +17,9 @@ export default async function ProgrammeLayout({
 }) {
   const { id } = await params;
 
-  return <ProgrammeShell programmeId={id}>{children}</ProgrammeShell>;
+  return (
+    <Suspense fallback={null}>
+      <ProgrammeShell programmeId={id}>{children}</ProgrammeShell>
+    </Suspense>
+  );
 }

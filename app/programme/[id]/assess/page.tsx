@@ -1,7 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { useParams } from "next/navigation";
+import { Suspense, useMemo, useState } from "react";
+import { useParams, useSearchParams } from "next/navigation";
 import { useAppData, type PriorityRating, type RagStatus } from "@/lib/app-data";
 import { Modal } from "@/components/modal";
 
@@ -30,12 +30,10 @@ const emptyEdit: EditAssessmentState = {
   rag: "Amber",
 };
 
-export default function AssessPage() {
+function AssessPageContent() {
   const params = useParams<{ id: string }>();
-  const programmeId =
-    typeof window !== "undefined"
-      ? new URLSearchParams(window.location.search).get("programme") ?? params.id
-      : params.id;
+  const searchParams = useSearchParams();
+  const programmeId = searchParams.get("programme") ?? params.id;
   const { state, addAssessment, updateAssessment, deleteAssessment } = useAppData();
   const [drafts, setDrafts] = useState<Record<string, { title: string; rag: RagStatus }>>({});
   const [editState, setEditState] = useState<EditAssessmentState>(emptyEdit);
@@ -410,5 +408,13 @@ export default function AssessPage() {
         </form>
       </Modal>
     </div>
+  );
+}
+
+export default function AssessPage() {
+  return (
+    <Suspense fallback={null}>
+      <AssessPageContent />
+    </Suspense>
   );
 }

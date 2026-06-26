@@ -1,7 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { useParams } from "next/navigation";
+import { Suspense, useMemo, useState } from "react";
+import { useParams, useSearchParams } from "next/navigation";
 import { useAppData, type Module } from "@/lib/app-data";
 import { Modal, ConfirmModal } from "@/components/modal";
 
@@ -27,12 +27,10 @@ type ResultState = {
   message: string;
 };
 
-export default function PlanPage() {
+function PlanPageContent() {
   const params = useParams<{ id: string }>();
-  const programmeId =
-    typeof window !== "undefined"
-      ? new URLSearchParams(window.location.search).get("programme") ?? params.id
-      : params.id;
+  const searchParams = useSearchParams();
+  const programmeId = searchParams.get("programme") ?? params.id;
   const {
     state,
     addModule,
@@ -453,5 +451,13 @@ export default function PlanPage() {
         </div>
       </Modal>
     </div>
+  );
+}
+
+export default function PlanPage() {
+  return (
+    <Suspense fallback={null}>
+      <PlanPageContent />
+    </Suspense>
   );
 }
