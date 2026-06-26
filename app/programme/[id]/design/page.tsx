@@ -11,6 +11,7 @@ type EditLoState = {
   open: boolean;
   loId: string;
   text: string;
+  category: (typeof loCategories)[number];
 };
 
 const loCategories = ["Disciplinary Skills", "Academic Content", "Attributes"] as const;
@@ -28,7 +29,7 @@ export default function DesignPage() {
   );
   const [draft, setDraft] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<(typeof loCategories)[number]>(loCategories[0]);
-  const [editLo, setEditLo] = useState<EditLoState>({ open: false, loId: "", text: "" });
+  const [editLo, setEditLo] = useState<EditLoState>({ open: false, loId: "", text: "", category: loCategories[0] });
 
   const learningOutcomes = state.learningOutcomes.filter((learningOutcome) => learningOutcome.programmeId === programmeId);
   const programme = state.programmes.find((record) => record.id === programmeId);
@@ -44,14 +45,21 @@ export default function DesignPage() {
     [learningOutcomes, selectedCompetencyId],
   );
 
-  const openEditLo = (loId: string, text: string) => {
-    setEditLo({ open: true, loId, text });
+  const openEditLo = (loId: string, text: string, category?: string) => {
+    setEditLo({
+      open: true,
+      loId,
+      text,
+      category: loCategories.includes(category as (typeof loCategories)[number])
+        ? (category as (typeof loCategories)[number])
+        : loCategories[0],
+    });
   };
 
   const handleEditSave = () => {
     if (editLo.text.trim().length < 10) return;
-    updateLearningOutcome(editLo.loId, { text: editLo.text.trim() });
-    setEditLo({ open: false, loId: "", text: "" });
+    updateLearningOutcome(editLo.loId, { text: editLo.text.trim(), category: editLo.category });
+    setEditLo({ open: false, loId: "", text: "", category: loCategories[0] });
   };
 
   return (
@@ -178,20 +186,9 @@ export default function DesignPage() {
                       <button
                         type="button"
                         className="rounded-full border border-slate-300 px-3 py-1 text-xs font-semibold text-slate-700"
-                        onClick={() => openEditLo(learningOutcome.id, learningOutcome.text)}
+                        onClick={() => openEditLo(learningOutcome.id, learningOutcome.text, learningOutcome.category)}
                       >
                         Edit
-                      </button>
-                      <button
-                        type="button"
-                        className="rounded-full border border-slate-300 px-3 py-1 text-xs font-semibold text-slate-700"
-                        onClick={() =>
-                          updateLearningOutcome(learningOutcome.id, {
-                            competencyId: null,
-                          })
-                        }
-                      >
-                        Unassign
                       </button>
                       <button
                         type="button"
@@ -323,7 +320,7 @@ export default function DesignPage() {
       {/* Edit LO modal */}
       <Modal
         open={editLo.open}
-        onClose={() => setEditLo({ open: false, loId: "", text: "" })}
+        onClose={() => setEditLo({ open: false, loId: "", text: "", category: loCategories[0] })}
         title="Edit learning outcome"
       >
         <form
@@ -335,6 +332,21 @@ export default function DesignPage() {
         >
           <label className="block text-sm font-medium text-slate-700">
             Learning outcome text
+
+            <label className="space-y-1 my-4 block ">
+              <select
+                className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm"
+                value={editLo.category}
+                onChange={(event) => setEditLo((state) => ({ ...state, category: event.target.value as (typeof loCategories)[number] }))}
+              >
+                {loCategories.map((category) => (
+                  <option key={category} value={category}>
+                    {category}
+                  </option>
+                ))}
+              </select>
+            </label>
+
             <textarea
               className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm"
               rows={4}
@@ -351,7 +363,7 @@ export default function DesignPage() {
             <button
               type="button"
               className="rounded-xl border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:border-slate-400"
-              onClick={() => setEditLo({ open: false, loId: "", text: "" })}
+              onClick={() => setEditLo({ open: false, loId: "", text: "", category: loCategories[0] })}
             >
               Cancel
             </button>
