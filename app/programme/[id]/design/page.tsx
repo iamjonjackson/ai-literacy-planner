@@ -13,6 +13,8 @@ type EditLoState = {
   text: string;
 };
 
+const loCategories = ["Disciplinary Skills", "Academic Content", "Attributes"] as const;
+
 export default function DesignPage() {
   const params = useParams<{ id: string }>();
   const programmeId =
@@ -25,6 +27,7 @@ export default function DesignPage() {
     frameworkCompetencies[0].id,
   );
   const [draft, setDraft] = useState("");
+  const [selectedCategory, setSelectedCategory] = useState<(typeof loCategories)[number]>(loCategories[0]);
   const [editLo, setEditLo] = useState<EditLoState>({ open: false, loId: "", text: "" });
 
   const learningOutcomes = state.learningOutcomes.filter((learningOutcome) => learningOutcome.programmeId === programmeId);
@@ -40,7 +43,6 @@ export default function DesignPage() {
     () => learningOutcomes.filter((learningOutcome) => learningOutcome.competencyId === selectedCompetencyId),
     [learningOutcomes, selectedCompetencyId],
   );
-  const unassignedOutcomes = learningOutcomes.filter((learningOutcome) => !learningOutcome.competencyId);
 
   const openEditLo = (loId: string, text: string) => {
     setEditLo({ open: true, loId, text });
@@ -217,11 +219,25 @@ export default function DesignPage() {
                 addLearningOutcome(programmeId, {
                   competencyId: selectedCompetencyId,
                   text: draft.trim(),
+                  category: selectedCategory,
                 });
                 setDraft("");
               }}
             >
-              <label className="text-sm font-semibold text-slate-700">Add Learning Outcome</label>
+              <label className="text-md font-semibold text-slate-700">Add Learning Outcome</label>
+              <label className="space-y-1 my-4 block ">
+                <select
+                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm"
+                  value={selectedCategory}
+                  onChange={(event) => setSelectedCategory(event.target.value as (typeof loCategories)[number])}
+                >
+                  {loCategories.map((category) => (
+                    <option key={category} value={category}>
+                      {category}
+                    </option>
+                  ))}
+                </select>
+              </label>
               <textarea
                 className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm"
                 rows={3}

@@ -141,10 +141,13 @@ type AppDataContextValue = {
   resetProgrammeModules: (programmeId: string) => BulkModuleDeletionResult;
   updateModule: (moduleId: string, patch: Partial<Pick<Module, "name" | "code" | "credits" | "description" | "year" | "aims" | "scheme" | "organiser" | "url" | "isCompulsory">>) => void;
   deleteModule: (moduleId: string) => ModuleDeletionImpact | null;
-  addLearningOutcome: (programmeId: string, input: { competencyId: string | null; text: string }) => string;
+  addLearningOutcome: (
+    programmeId: string,
+    input: { competencyId: string | null; text: string; category?: string },
+  ) => string;
   updateLearningOutcome: (
     learningOutcomeId: string,
-    patch: Partial<Pick<LearningOutcome, "text" | "competencyId" | "moduleId">>,
+    patch: Partial<Pick<LearningOutcome, "text" | "competencyId" | "moduleId" | "category">>,
   ) => void;
   deleteLearningOutcome: (learningOutcomeId: string) => void;
   addAssessment: (
@@ -680,7 +683,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const addLearningOutcome = useCallback(
-    (programmeId: string, input: { competencyId: string | null; text: string }) => {
+    (programmeId: string, input: { competencyId: string | null; text: string; category?: string }) => {
       const learningOutcomeId = generateId();
       setState((current) => ({
         ...current,
@@ -693,6 +696,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
             competencyId: input.competencyId,
             text: input.text,
             moduleId: null,
+            category: input.category,
           },
         ],
       }));
@@ -705,7 +709,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
   const updateLearningOutcome = useCallback(
     (
       learningOutcomeId: string,
-      patch: Partial<Pick<LearningOutcome, "text" | "competencyId" | "moduleId">>,
+      patch: Partial<Pick<LearningOutcome, "text" | "competencyId" | "moduleId" | "category">>,
     ) => {
       setState((current) => {
         const target = current.learningOutcomes.find((learningOutcome) => learningOutcome.id === learningOutcomeId);

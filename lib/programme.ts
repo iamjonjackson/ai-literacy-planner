@@ -2,8 +2,8 @@ export const demoProgrammeId = "sample-programme";
 
 export const programmeTabs = [
   { slug: "explore", label: "Explore" },
+  { slug: "plan", label: "Plan & Scan" },
   { slug: "design", label: "Design" },
-  { slug: "plan", label: "Plan" },
   { slug: "map", label: "Map" },
   { slug: "assess", label: "Assess" },
   { slug: "implement", label: "Implement" },

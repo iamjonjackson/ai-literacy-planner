@@ -301,8 +301,22 @@ export default function PlanPage() {
           <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
             {(modulesByYear.get(year) ?? []).map((module) => (
               <article key={module.id} className="rounded-2xl border border-slate-200 p-4">
+
+                    {module.url ? (
+                      <a
+                        href={module.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-md font-semibold hover:!underline"
+                      >
+                        {module.code} {module.name}
+                      </a>
+                    ) : (
+                      <h4 className="text-md font-semibold text-slate-900">{module.code} {module.name}</h4>
+                    )}
+{/* 
                 <h4 className="font-semibold text-slate-900">{module.name}</h4>
-                <p className="mt-1 text-xs text-slate-500">{module.code || "No code"}</p>
+                <p className="mt-1 text-xs text-slate-500">{module.code || "No code"}</p> */}
                 <p className="mt-1 text-xs text-slate-500">Credits: {module.credits || "-"}</p>
                 {module.description ? (
                   <p className="mt-1 text-xs text-slate-500 line-clamp-2">{module.description}</p>
