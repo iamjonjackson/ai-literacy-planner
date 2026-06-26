@@ -215,7 +215,7 @@ function PlanPageContent() {
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <p className="text-sm font-medium uppercase tracking-[0.2em] text-blue-600">Programme structure</p>
-            <h2 className="mt-2 text-2xl font-semibold text-slate-900">Plan year and module layout</h2>
+            <h2 className="mt-2 text-2xl font-semibold text-slate-900">Modules within scope</h2>
           </div>
           <div className="flex flex-wrap gap-2">
             {!isViewer ? (
