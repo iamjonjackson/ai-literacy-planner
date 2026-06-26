@@ -62,7 +62,7 @@ type LearningOutcome = {
 };
 
 type PriorityRating = "Low" | "Medium" | "High";
-type RagStatus = "Red" | "Amber" | "Green";
+type RagStatus = "" | "Red" | "Amber" | "Green";
 
 type Assessment = {
   id: string;

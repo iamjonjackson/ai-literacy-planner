@@ -6,7 +6,7 @@ import { useAppData, type PriorityRating, type RagStatus } from "@/lib/app-data"
 import { Modal } from "@/components/modal";
 
 const priorities: PriorityRating[] = ["High", "Medium", "Low"];
-const rags: RagStatus[] = ["Red", "Amber", "Green"];
+const rags: RagStatus[] = ["", "Red", "Amber", "Green"];
 
 type EditAssessmentState = {
   open: boolean;
@@ -68,6 +68,7 @@ function AssessPageContent() {
       Low: 0,
     };
     const byRag: Record<RagStatus, number> = {
+      "": 0,
       Red: 0,
       Amber: 0,
       Green: 0,
@@ -89,6 +90,8 @@ function AssessPageContent() {
       assessedLearningOutcomes: new Set(assessments.flatMap((assessment) => assessment.learningOutcomeIds)).size,
     };
   }, [assessments]);
+
+  const coverage = Math.round(((summary.byRag.Green + summary.byRag.Amber + summary.byRag.Red) / summary.total) * 100);
 
   const openEditAssessment = (assessment: (typeof assessments)[0]) => {
     setEditState({
@@ -120,11 +123,11 @@ function AssessPageContent() {
     <div className="space-y-6">
       <section className="grid gap-4 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm md:grid-cols-4">
         <article className="rounded-2xl bg-slate-50 p-4">
-          <p className="text-xs uppercase tracking-wide text-slate-500">Total assessments</p>
+          <p className="text-sm font-medium uppercase tracking-[0.2em] text-blue-600">Total assessments</p>
           <p className="mt-2 text-2xl font-semibold text-slate-900">{summary.total}</p>
         </article>
         <article className="rounded-2xl bg-slate-50 p-4">
-          <p className="text-xs uppercase tracking-wide text-slate-500">Priority</p>
+          <p className="text-sm font-medium uppercase tracking-[0.2em] text-blue-600">Priority</p>
           <p className="mt-2 text-sm text-slate-700">
             {summary.byPriority.High} High<br />
             {summary.byPriority.Medium} Medium<br />
@@ -133,23 +136,32 @@ function AssessPageContent() {
           </p>
         </article>
         <article className="rounded-2xl bg-slate-50 p-4">
-          <p className="text-xs uppercase tracking-wide text-slate-500">AI and Assessment taxonomy</p>
+          <p className="text-sm font-medium uppercase tracking-[0.2em] text-blue-600">AI taxonomy</p>
           <p className="mt-2 text-sm text-slate-700">
             🔴 {summary.byRag.Red} (Secure, No AI)<br />
             🟡 {summary.byRag.Amber} (Optional AI)<br />
             🟢 {summary.byRag.Green} (Mandatory AI)
           </p>
         </article>
+
         <article className="rounded-2xl bg-slate-50 p-4">
-          <p className="text-xs uppercase tracking-wide text-slate-500">LO assessment coverage</p>
-          <p className="mt-2 text-sm text-slate-700">
-            {summary.assessedLearningOutcomes} of {learningOutcomes.length} ·{" "}
-            {learningOutcomes.length === 0
-              ? 0
-              : Math.round((summary.assessedLearningOutcomes / learningOutcomes.length) * 100)}
-            %
-          </p>
+          <p className="text-sm font-medium uppercase tracking-[0.2em] text-blue-600">Taxonomy Tracker</p>
+          <div className="flex items-end justify-between gap-4">
+            <div>
+              <h2 className="mt-2 text-sm text-slate-900">
+                {(summary.byRag.Green + summary.byRag.Amber + summary.byRag.Red)}  of {summary.total} assessments categorised
+              </h2>
+            </div>
+            <p className="text-2xl font-semibold text-slate-900">{coverage}%</p>
+          </div>
+          <div className="mt-4 h-3 rounded-full bg-slate-200">
+            <div
+              className={`h-3 rounded-full width-full ${coverage === 100 ? "bg-emerald-500" : "bg-blue-600"}`}
+              style={{ width: `${coverage}%` }}
+            />
+          </div>
         </article>
+
       </section>
 
       <section className="space-y-4">
