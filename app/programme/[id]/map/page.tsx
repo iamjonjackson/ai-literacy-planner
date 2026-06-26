@@ -205,7 +205,6 @@ function MapPageContent() {
                           <article key={module.id} className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm ">
                             <div className="flex items-start justify-between gap-3 ">
                               <div>
-                                {/* <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Year {module.year}</p> */}
 
                                 {module.url ? (
                                   <a
@@ -227,17 +226,17 @@ function MapPageContent() {
                             </div>
                             <div className="mt-3 grid gap-4 lg:grid-cols-2">
                               {(outcomesByModule.get(module.id) ?? []).map((learningOutcome) => {
-                                // const competency = frameworkCompetencies.find(
-                                //   (record) => record.id === learningOutcome.competencyId,
-                                // );
-                                //TODO: if LO has an AI unesco competency, show LO with a green border.
-
+                
                                 return (
-                                  <span key={learningOutcome.id} className="text-xs text-blue-700">
+                                  <span
+                                    key={learningOutcome.id}
+                                    className={`text-xs ${
+                                      learningOutcome.competencyId ? "border-green-500 bg-green-50 rounded-xl border p-3" : "text-blue-700"
+                                    }`}
+                                  >
                                     {/* {competency?.id ?? "Imported"}:  */}
-                                    {/* {learningOutcome.text.slice(0, 80)} */}
                                     {learningOutcome.category ? `(${learningOutcome.category}) ` : ""}
-                                    {learningOutcome.loNumber ? `${learningOutcome.loNumber}. ` : ""}
+                                    {/* {learningOutcome.loNumber ? `${learningOutcome.loNumber}. ` : ""} */}
                                     {learningOutcome.text}
                                   </span>
                                 );
@@ -274,7 +273,7 @@ function MapPageContent() {
                   {/* <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
                     {competency?.id ?? "Imported LO"}
                   </p> */}
-                  <p className="mt-1 text-sm text-slate-700">{learningOutcome.text}</p>
+                  <p className="mt-1 text-sm text-slate-700">({learningOutcome.category}) {learningOutcome.text}</p>
                   <div className="mt-3 flex gap-2">
                     <select
                       className="flex-1 rounded-lg border border-slate-200 px-2 py-1 text-xs"

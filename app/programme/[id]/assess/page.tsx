@@ -187,122 +187,156 @@ function AssessPageContent() {
                       </span>
                     </div>
 
-                    <div className="mt-4 space-y-3">
-                      {moduleAssessments.map((assessment) => (
-                        <article key={assessment.id} className="rounded-xl border border-slate-200 p-4">
-                          <div className="flex flex-wrap items-start justify-between gap-2">
-                            <div>
-                              <h3 className="font-semibold text-slate-900">{assessment.title}</h3>
-                              <p className="text-sm text-slate-600">{assessment.type || "Type not set"}</p>
+                    <div className="grid gap-6 xl:grid-cols-[minmax(0,2fr)_460px]">
+
+
+                      <div className="mt-4 space-y-3">
+                        {moduleAssessments.map((assessment) => (
+                          <article key={assessment.id} className="rounded-xl border border-slate-200 p-4">
+                            <div className="flex flex-wrap items-start justify-between gap-2">
+                              <div>
+                                <h3 className="font-semibold text-slate-900">{assessment.title}</h3>
+                                <p className="text-sm text-slate-600">{assessment.type || "Type not set"}</p>
+                              </div>
+                              <div className="flex flex-wrap gap-2">
+                                <span
+                                  className={`rounded-full px-2 py-1 text-xs font-semibold ${
+                                    assessment.priority === "High"
+                                      ? "bg-gray-800 text-white"
+                                      : assessment.priority === "Medium"
+                                        ? "bg-gray-500 text-white"
+                                        : assessment.priority === "Low"
+                                          ? "bg-gray-200 text-gray-800"
+                                          : "border border-gray-500 text-slate-700"
+                                  }`}
+                                >
+                                  {assessment.priority ?? "No action required"}
+                                </span>
+                                <span
+                                  className={`rounded-full px-2 py-1 text-xs font-semibold ${
+                                    assessment.rag === "Red"
+                                      ? "bg-red-100 text-red-700"
+                                      : assessment.rag === "Amber"
+                                        ? "bg-amber-100 text-amber-700"
+                                        : assessment.rag === "Green"
+                                          ? "bg-emerald-100 text-emerald-700"
+                                          : "bg-slate-100 text-slate-700"
+                                  }`}
+                                >
+                                  {assessment.rag ?? "Missing AI and Assessment taxonomy"}
+                                </span>
+                              </div>
                             </div>
-                            <div className="flex flex-wrap gap-2">
-                              <span
-                                className={`rounded-full px-2 py-1 text-xs font-semibold ${
-                                  assessment.priority === "High"
-                                    ? "bg-gray-800 text-white"
-                                    : assessment.priority === "Medium"
-                                      ? "bg-gray-500 text-white"
-                                      : assessment.priority === "Low"
-                                        ? "bg-gray-200 text-gray-800"
-                                        : "border border-gray-500 text-slate-700"
-                                }`}
+                            <p className="mt-2 text-sm text-slate-700">{assessment.description || "No description"}</p>
+                            {!isViewer ? (
+                              <div className="mt-3 flex flex-wrap gap-2">
+                                <button
+                                  type="button"
+                                  className="rounded-full border border-slate-300 px-3 py-1 text-xs font-semibold text-slate-700"
+                                  onClick={() => openEditAssessment(assessment)}
+                                >
+                                  Edit
+                                </button>
+                                <button
+                                  type="button"
+                                  className="rounded-full border border-red-200 px-3 py-1 text-xs font-semibold text-red-700"
+                                  onClick={() => deleteAssessment(assessment.id)}
+                                >
+                                  Delete
+                                </button>
+                              </div>
+                            ) : null}
+                          </article>
+                        ))}
+                        
+                        {!isViewer ? (
+                          <form
+                            className="mt-4 rounded-xl bg-slate-50 p-4"
+                            onSubmit={(event) => {
+                              event.preventDefault();
+                              if (!draft.title.trim()) {
+                                return;
+                              }
+
+                              addAssessment(programmeId, {
+                                moduleId: module.id,
+                                title: draft.title.trim(),
+                                rag: draft.rag,
+                              });
+
+                              setDrafts((current) => ({
+                                ...current,
+                                [module.id]: { title: "", rag: "Amber" },
+                              }));
+                            }}
+                          >
+                            <h3 className="text-sm font-semibold text-slate-700">Add assessment</h3>
+                            <div className="mt-3 grid gap-2 md:grid-cols-[1fr_180px_auto]">
+                              <input
+                                className="rounded-lg border border-slate-200 px-3 py-2 text-sm"
+                                placeholder="Assessment title"
+                                value={draft.title}
+                                onChange={(event) =>
+                                  setDrafts((current) => ({
+                                    ...current,
+                                    [module.id]: { ...draft, title: event.target.value },
+                                  }))
+                                }
+                              />
+                              <select
+                                className="rounded-lg border border-slate-200 px-2 py-2 text-sm"
+                                value={draft.rag}
+                                onChange={(event) =>
+                                  setDrafts((current) => ({
+                                    ...current,
+                                    [module.id]: { ...draft, rag: event.target.value as RagStatus },
+                                  }))
+                                }
                               >
-                                {assessment.priority ?? "No action required"}
-                              </span>
-                              <span
-                                className={`rounded-full px-2 py-1 text-xs font-semibold ${
-                                  assessment.rag === "Red"
-                                    ? "bg-red-100 text-red-700"
-                                    : assessment.rag === "Amber"
-                                      ? "bg-amber-100 text-amber-700"
-                                      : assessment.rag === "Green"
-                                        ? "bg-emerald-100 text-emerald-700"
-                                        : "bg-slate-100 text-slate-700"
-                                }`}
-                              >
-                                {assessment.rag ?? "Missing AI and Assessment taxonomy"}
-                              </span>
-                            </div>
-                          </div>
-                          <p className="mt-2 text-sm text-slate-700">{assessment.description || "No description"}</p>
-                          {!isViewer ? (
-                            <div className="mt-3 flex flex-wrap gap-2">
-                              <button
-                                type="button"
-                                className="rounded-full border border-slate-300 px-3 py-1 text-xs font-semibold text-slate-700"
-                                onClick={() => openEditAssessment(assessment)}
-                              >
-                                Edit
+                                {rags.map((rag) => (
+                                  <option key={rag} value={rag}>
+                                    {rag}
+                                  </option>
+                                ))}
+                              </select>
+                              <button className="rounded-lg bg-blue-600 px-3 py-2 text-sm font-semibold text-white" type="submit">
+                                Save
                               </button>
-                              <button
-                                type="button"
-                                className="rounded-full border border-red-200 px-3 py-1 text-xs font-semibold text-red-700"
-                                onClick={() => deleteAssessment(assessment.id)}
-                              >
-                                Delete
-                              </button>
                             </div>
-                          ) : null}
-                        </article>
-                      ))}
+                          </form>
+                        ) : null}
+
+                      </div>
+
+                      <div className="mt-4 space-y-3">
+
+                        {learningOutcomes.filter((lo) => lo.moduleId === module.id && lo.competencyId).length === 0 ? (
+                          <></>
+                        ) : (
+                          <>
+                            <h3 className="text-sm font-semibold text-slate-700">New Learning outcomes</h3>
+                            {learningOutcomes
+                              .filter((lo) => lo.moduleId === module.id && lo.competencyId)
+                              .map((learningOutcome) => {
+
+                                return (
+                                  <article
+                                    key={learningOutcome.id}
+                                    className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm"
+                                  >
+                                    ({learningOutcome.category}) {learningOutcome.text}
+                                  </article>
+                                );
+                            })}
+                          </>
+
+                        )}
+                        
+                      </div>
+
                     </div>
 
-                    {!isViewer ? (
-                      <form
-                        className="mt-4 rounded-xl bg-slate-50 p-4"
-                        onSubmit={(event) => {
-                          event.preventDefault();
-                          if (!draft.title.trim()) {
-                            return;
-                          }
-
-                          addAssessment(programmeId, {
-                            moduleId: module.id,
-                            title: draft.title.trim(),
-                            rag: draft.rag,
-                          });
-
-                          setDrafts((current) => ({
-                            ...current,
-                            [module.id]: { title: "", rag: "Amber" },
-                          }));
-                        }}
-                      >
-                        <h3 className="text-sm font-semibold text-slate-700">Add assessment</h3>
-                        <div className="mt-3 grid gap-2 md:grid-cols-[1fr_180px_auto]">
-                          <input
-                            className="rounded-lg border border-slate-200 px-3 py-2 text-sm"
-                            placeholder="Assessment title"
-                            value={draft.title}
-                            onChange={(event) =>
-                              setDrafts((current) => ({
-                                ...current,
-                                [module.id]: { ...draft, title: event.target.value },
-                              }))
-                            }
-                          />
-                          <select
-                            className="rounded-lg border border-slate-200 px-2 py-2 text-sm"
-                            value={draft.rag}
-                            onChange={(event) =>
-                              setDrafts((current) => ({
-                                ...current,
-                                [module.id]: { ...draft, rag: event.target.value as RagStatus },
-                              }))
-                            }
-                          >
-                            {rags.map((rag) => (
-                              <option key={rag} value={rag}>
-                                {rag}
-                              </option>
-                            ))}
-                          </select>
-                          <button className="rounded-lg bg-blue-600 px-3 py-2 text-sm font-semibold text-white" type="submit">
-                            Save
-                          </button>
-                        </div>
-                      </form>
-                    ) : null}
+                    
                   </article>
                 );
               })}
