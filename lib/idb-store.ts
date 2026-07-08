@@ -60,6 +60,7 @@ export type IdbAssessment = {
   duration: string;
   priority: "Low" | "Medium" | "High" | null;
   rag: "Red" | "Amber" | "Green" | null;
+  status?: "to_delete";
   learningOutcomeIds: string[];
   updatedAt: string;
   syncStatus: SyncStatus;

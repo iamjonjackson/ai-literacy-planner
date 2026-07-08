@@ -71,6 +71,7 @@ function AssessPageContent() {
   const assessments = state.assessments.filter((assessment) => assessment.programmeId === programmeId);
 
   const summary = useMemo(() => {
+    const activeAssessments = assessments.filter((assessment) => assessment.status !== "to_delete");
     const byPriority: Record<PriorityRating, number> = {
       High: 0,
       Medium: 0,
@@ -83,7 +84,7 @@ function AssessPageContent() {
       Green: 0,
     };
 
-    assessments.forEach((assessment) => {
+    activeAssessments.forEach((assessment) => {
       if (assessment.priority) {
         byPriority[assessment.priority] += 1;
       }
@@ -93,14 +94,16 @@ function AssessPageContent() {
     });
 
     return {
-      total: assessments.length,
+      total: activeAssessments.length,
       byPriority,
       byRag,
-      assessedLearningOutcomes: new Set(assessments.flatMap((assessment) => assessment.learningOutcomeIds)).size,
+      assessedLearningOutcomes: new Set(activeAssessments.flatMap((assessment) => assessment.learningOutcomeIds)).size,
     };
   }, [assessments]);
 
-  const coverage = Math.round(((summary.byRag.Green + summary.byRag.Amber + summary.byRag.Red) / summary.total) * 100);
+  const coverage = summary.total
+    ? Math.round(((summary.byRag.Green + summary.byRag.Amber + summary.byRag.Red) / summary.total) * 100)
+    : 0;
 
   const openEditAssessment = (assessment: (typeof assessments)[0]) => {
     setEditState({
@@ -216,7 +219,14 @@ function AssessPageContent() {
 
                       <div className="mt-4 space-y-3">
                         {moduleAssessments.map((assessment) => (
-                          <article key={assessment.id} className="rounded-xl border border-slate-200 p-4">
+                          <article
+                            key={assessment.id}
+                            className={`rounded-xl border p-4 ${
+                              assessment.status === "to_delete"
+                                ? "border-slate-300 bg-slate-50"
+                                : "border-slate-200 "
+                            }`}
+                          >
                             <div className="flex flex-wrap items-start justify-between gap-2">
                               <div>
                                 <h3 className="font-semibold text-slate-900">{assessment.title}</h3>
@@ -229,51 +239,82 @@ function AssessPageContent() {
                                 </p>
                               </div>
                               <div className="flex flex-wrap gap-2">
-                                <span
-                                  className={`rounded-full px-2 py-1 text-xs font-semibold ${
-                                    assessment.priority === "High"
-                                      ? "bg-gray-800 text-white"
-                                      : assessment.priority === "Medium"
-                                        ? "bg-gray-500 text-white"
-                                        : assessment.priority === "Low"
-                                          ? "bg-gray-200 text-gray-800"
-                                          : "border border-gray-500 text-slate-700"
-                                  }`}
-                                >
-                                  {assessment.priority ?? "No action required"}
-                                </span>
-                                <span
-                                  className={`rounded-full px-2 py-1 text-xs font-semibold ${
-                                    assessment.rag === "Red"
-                                      ? "bg-red-100 text-red-700"
-                                      : assessment.rag === "Amber"
-                                        ? "bg-amber-100 text-amber-700"
-                                        : assessment.rag === "Green"
-                                          ? "bg-emerald-100 text-emerald-700"
-                                          : "bg-slate-100 text-slate-700"
-                                  }`}
-                                >
-                                  {!assessment.rag ? "Missing AI taxonomy" : assessment.rag}
-                                </span>
+                                {assessment.status === "to_delete" ? (
+                                  <span className="rounded-full bg-amber-200 px-2 py-1 text-xs font-semibold text-amber-800">
+                                    For deletion
+                                  </span>
+                                ) : (
+                                  <>
+                                    <span
+                                      className={`rounded-full px-2 py-1 text-xs font-semibold ${
+                                        assessment.priority === "High"
+                                          ? "bg-gray-800 text-white"
+                                          : assessment.priority === "Medium"
+                                            ? "bg-gray-500 text-white"
+                                            : assessment.priority === "Low"
+                                              ? "bg-gray-200 text-gray-800"
+                                              : "border border-gray-500 text-slate-700"
+                                      }`}
+                                    >
+                                      {assessment.priority ?? "No action required"}
+                                    </span>
+                                    <span
+                                      className={`rounded-full px-2 py-1 text-xs font-semibold ${
+                                        assessment.rag === "Red"
+                                          ? "bg-red-100 text-red-700"
+                                          : assessment.rag === "Amber"
+                                            ? "bg-amber-100 text-amber-700"
+                                            : assessment.rag === "Green"
+                                              ? "bg-emerald-100 text-emerald-700"
+                                              : "bg-slate-100 text-slate-700"
+                                      }`}
+                                    >
+                                      {!assessment.rag ? "Missing AI taxonomy" : assessment.rag}
+                                    </span>
+                                  </>
+                                )}
+                                
                               </div>
                             </div>
                             <p className="mt-2 text-sm text-slate-700">{assessment.description || "No description"}</p>
                             {!isViewer ? (
                               <div className="mt-3 flex flex-wrap gap-2">
-                                <button
-                                  type="button"
-                                  className="rounded-full border border-slate-300 px-3 py-1 text-xs font-semibold text-slate-700"
-                                  onClick={() => openEditAssessment(assessment)}
-                                >
-                                  Edit
-                                </button>
-                                <button
-                                  type="button"
-                                  className="rounded-full border border-red-200 px-3 py-1 text-xs font-semibold text-red-700"
-                                  onClick={() => setDeleteAssessmentState({ open: true, id: assessment.id })}
-                                >
-                                  Delete
-                                </button>
+                                {assessment.status != "to_delete" ? (
+                                  <>
+                                    <button
+                                      type="button"
+                                      className="rounded-full border border-slate-300 px-3 py-1 text-xs font-semibold text-slate-700"
+                                      onClick={() => openEditAssessment(assessment)}
+                                    >
+                                      Edit
+                                    </button>
+                                    <button
+                                      type="button"
+                                      className="rounded-full border border-red-200 px-3 py-1 text-xs font-semibold text-red-700"
+                                      onClick={() => setDeleteAssessmentState({ open: true, id: assessment.id })}
+                                    >
+                                      Delete
+                                    </button>
+                                  </>
+                                ) : null}
+
+                                {assessment.status === "to_delete" ? (
+                                  <button
+                                    type="button"
+                                    className="rounded-full border border-emerald-200 px-3 py-1 text-xs font-semibold text-emerald-700"
+                                    onClick={() => updateAssessment(assessment.id, { status: undefined })}
+                                  >
+                                    Restore
+                                  </button>
+                                ) : (
+                                  <button
+                                    type="button"
+                                    className="rounded-full border border-amber-200 px-3 py-1 text-xs font-semibold text-amber-700"
+                                    onClick={() => updateAssessment(assessment.id, { status: "to_delete" })}
+                                  >
+                                    Mark for deletion
+                                  </button>
+                                )}
                               </div>
                             ) : null}
                           </article>

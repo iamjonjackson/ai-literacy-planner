@@ -76,6 +76,7 @@ type Assessment = {
   duration: string;
   priority: PriorityRating | null;
   rag: RagStatus | null;
+  status?: "to_delete";
   learningOutcomeIds: string[];
 };
 
@@ -173,7 +174,7 @@ type AppDataContextValue = {
   updateAssessment: (
     assessmentId: string,
     patch: Partial<
-      Pick<Assessment, "assessmentCode" | "title" | "description" | "weight" | "duration" | "priority" | "rag" | "learningOutcomeIds" | "moduleId">
+      Pick<Assessment, "assessmentCode" | "title" | "description" | "weight" | "duration" | "priority" | "rag" | "status" | "learningOutcomeIds" | "moduleId">
     >,
   ) => void;
   deleteAssessment: (assessmentId: string) => void;
@@ -439,6 +440,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
           module_id: lo.moduleId,
           category: lo.category,
           lo_number: lo.loNumber,
+          status: lo.status,
           updated_at: lo.updatedAt,
         });
         if (!error) await markSynced("learning_outcomes", lo.id);
@@ -457,6 +459,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
           duration: assessment.duration,
           priority_rating: assessment.priority?.toLowerCase() ?? null,
           rag_status: assessment.rag?.toLowerCase() ?? null,
+          status: assessment.status,
           updated_at: assessment.updatedAt,
         });
         if (!error) await markSynced("assessments", assessment.id);
@@ -822,7 +825,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
       patch: Partial<
         Pick<
           Assessment,
-          "assessmentCode" | "title" | "description" | "weight" | "duration" | "priority" | "rag" | "learningOutcomeIds" | "moduleId"
+          "assessmentCode" | "title" | "description" | "weight" | "duration" | "priority" | "rag" | "status" | "learningOutcomeIds" | "moduleId"
         >
       >,
     ) => {

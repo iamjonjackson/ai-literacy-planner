@@ -345,6 +345,7 @@ create table public.assessments (
   duration         text,            -- free-text duration from CSV/manual entry (e.g. "1,500 Words")
   priority_rating  text check (priority_rating in ('low', 'medium', 'high')),
   rag_status       text check (rag_status in ('red', 'amber', 'green')),  -- nullable: NULL for imported assessments not yet rated
+  status           text check (status in ('to_delete')), -- NULL for active assessments; set when flagged for removal but retained in UI/history
   created_at       timestamptz not null default now(),
   updated_at       timestamptz not null default now()
 );
@@ -358,6 +359,9 @@ alter table public.assessments
 
 alter table public.assessments
   add column if not exists duration text;
+
+alter table public.assessments
+  add column if not exists status text check (status in ('to_delete'));
 
 alter table public.assessments
   alter column weight type text

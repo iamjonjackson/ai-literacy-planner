@@ -19,9 +19,14 @@ function MapPageContent() {
   const learningOutcomes = state.learningOutcomes.filter((learningOutcome) => learningOutcome.programmeId === programmeId);
 
   const newLearningOutcomes = learningOutcomes.filter((learningOutcome) => learningOutcome.competencyId);
+  const activeNewLearningOutcomes = newLearningOutcomes.filter(
+    (learningOutcome) => learningOutcome.status !== "to_delete",
+  );
 
-  const mapped = newLearningOutcomes.filter((learningOutcome) => learningOutcome.moduleId).length;
-  const mappingCoverage = newLearningOutcomes.length ? Math.round((mapped / newLearningOutcomes.length) * 100) : 0;
+  const mapped = activeNewLearningOutcomes.filter((learningOutcome) => learningOutcome.moduleId).length;
+  const mappingCoverage = activeNewLearningOutcomes.length
+    ? Math.round((mapped / activeNewLearningOutcomes.length) * 100)
+    : 0;
 
   const outcomesByModule = new Map<string, typeof learningOutcomes>();
   learningOutcomes.forEach((learningOutcome) => {
@@ -41,7 +46,7 @@ function MapPageContent() {
             <div>
               <p className="text-sm font-medium uppercase tracking-[0.2em] text-blue-600">Mapping coverage</p>
               <h2 className="mt-2 text-xl font-semibold text-slate-900">
-                {mapped} of {newLearningOutcomes.length} new LOs mapped to modules
+                {mapped} of {activeNewLearningOutcomes.length} new LOs mapped to modules
               </h2>
             </div>
             <p className="text-2xl font-semibold text-slate-900">{mappingCoverage}%</p>
@@ -91,23 +96,60 @@ function MapPageContent() {
 
                               </div>
                               <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
-                                {(outcomesByModule.get(module.id) ?? []).length} LOs
+                                {(outcomesByModule.get(module.id) ?? []).filter((learningOutcome) => learningOutcome.status !== "to_delete").length} LOs
                               </span>
                             </div>
                             <div className="mt-3 grid gap-4 lg:grid-cols-2">
                               {(outcomesByModule.get(module.id) ?? []).map((learningOutcome) => {
+                                const isMarkedForDeletion = learningOutcome.status === "to_delete";
                 
                                 return (
                                   <span
                                     key={learningOutcome.id}
-                                    className={`text-xs ${
-                                      learningOutcome.competencyId ? "border-green-500 bg-green-50 rounded-xl border p-3" : "text-blue-700"
+                                    className={`text-xs rounded-xl border p-3 ${
+                                      isMarkedForDeletion
+                                        ? "border-amber-300 bg-amber-50"
+                                        : learningOutcome.competencyId
+                                          ? "border-green-500 bg-green-50"
+                                          : "border-slate-200 text-blue-700"
                                     }`}
                                   >
                                     {/* {competency?.id ?? "Imported"}:  */}
                                     {learningOutcome.category ? `(${learningOutcome.category}) ` : ""}
                                     {/* {learningOutcome.loNumber ? `${learningOutcome.loNumber}. ` : ""} */}
                                     {learningOutcome.text}
+                                    {!isViewer ? (
+                                      <div className="mt-2 flex flex-wrap gap-2">
+                                        {isMarkedForDeletion ? (
+                                          <>
+                                            <span className="rounded-full bg-amber-200 inline-block px-2 py-1 m-0 text-xs font-semibold text-amber-800">
+                                              For deletion
+                                            </span>
+                                            <button
+                                              type="button"
+                                              className="rounded-full border border-emerald-200 px-3 py-1 text-xs font-semibold text-emerald-700"
+                                              onClick={() =>
+                                                updateLearningOutcome(learningOutcome.id, { status: undefined })
+                                              }
+                                            >
+                                              Restore
+                                            </button>
+                                          </>
+                                          // if does not have a mapped competency, allow mark for deletion
+
+                                        ) : learningOutcome.competencyId ? null : (
+                                          <button
+                                            type="button"
+                                            className="rounded-full border border-amber-200 px-3 py-1 text-xs font-semibold text-amber-700"
+                                            onClick={() =>
+                                              updateLearningOutcome(learningOutcome.id, { status: "to_delete" })
+                                            }
+                                          >
+                                            Mark for deletion
+                                          </button>
+                                        )}
+                                      </div>
+                                    ) : null}
                                   </span>
                                 );
                               })}
