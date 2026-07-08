@@ -69,9 +69,10 @@ function assessmentSummaryRows(data: ExportData) {
   return data.assessments.map((a) => {
     const mod = moduleMap.get(a.moduleId);
     return {
+      "Assessment Code": a.assessmentCode || "",
       "Assessment Title": a.title,
-      Type: a.type || "",
-      "Weight (%)": a.weight || "",
+      "Weight": a.weight || "",
+      Duration: a.duration || "",
       Priority: a.priority || "",
       "AI and Assessment taxonomy": a.rag || "",
       Module: mod?.name || "",

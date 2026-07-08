@@ -52,10 +52,11 @@ export type IdbAssessment = {
   id: string;
   programmeId: string;
   moduleId: string;
+  assessmentCode: string;
   title: string;
-  type: string;
   description: string;
   weight: string;
+  duration: string;
   priority: "Low" | "Medium" | "High" | null;
   rag: "Red" | "Amber" | "Green" | null;
   learningOutcomeIds: string[];

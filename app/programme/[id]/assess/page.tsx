@@ -11,10 +11,11 @@ const rags: RagStatus[] = ["", "Red", "Amber", "Green"];
 type EditAssessmentState = {
   open: boolean;
   id: string;
+  assessmentCode: string;
   title: string;
-  type: string;
   description: string;
   weight: string;
+  duration: string;
   priority: PriorityRating | "";
   rag: RagStatus;
 };
@@ -22,10 +23,11 @@ type EditAssessmentState = {
 const emptyEdit: EditAssessmentState = {
   open: false,
   id: "",
+  assessmentCode: "",
   title: "",
-  type: "",
   description: "",
   weight: "",
+  duration: "",
   priority: "",
   rag: "Amber",
 };
@@ -97,10 +99,11 @@ function AssessPageContent() {
     setEditState({
       open: true,
       id: assessment.id,
+      assessmentCode: assessment.assessmentCode ?? "",
       title: assessment.title,
-      type: assessment.type ?? "",
       description: assessment.description ?? "",
       weight: assessment.weight ?? "",
+      duration: assessment.duration ?? "",
       priority: assessment.priority ?? "",
       rag: assessment.rag ?? "Amber",
     });
@@ -109,10 +112,11 @@ function AssessPageContent() {
   const handleEditSave = () => {
     if (!editState.title.trim()) return;
     updateAssessment(editState.id, {
+      assessmentCode: editState.assessmentCode.trim(),
       title: editState.title.trim(),
-      type: editState.type.trim(),
       description: editState.description.trim(),
       weight: editState.weight.trim(),
+      duration: editState.duration.trim(),
       priority: editState.priority || null,
       rag: editState.rag,
     });
@@ -208,7 +212,13 @@ function AssessPageContent() {
                             <div className="flex flex-wrap items-start justify-between gap-2">
                               <div>
                                 <h3 className="font-semibold text-slate-900">{assessment.title}</h3>
-                                <p className="text-sm text-slate-600">{assessment.type || "Type not set"} · {assessment.weight}</p>
+                                <p className="text-sm text-slate-600">
+                                  {[
+                                    assessment.assessmentCode ? `Code ${assessment.assessmentCode}` : "",
+                                    assessment.weight,
+                                    assessment.duration,
+                                  ].filter((value) => value.trim() !== "").join(" · ") || "Assessment details not set"}
+                                </p>
                               </div>
                               <div className="flex flex-wrap gap-2">
                                 <span
@@ -380,12 +390,12 @@ function AssessPageContent() {
             />
           </label>
           <label className="block text-sm font-medium text-slate-700">
-            Type
+            Assessment code
             <input
               className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm"
-              placeholder="e.g. Essay, Exam, Project"
-              value={editState.type}
-              onChange={(e) => setEditState((s) => ({ ...s, type: e.target.value }))}
+              placeholder="e.g. 001"
+              value={editState.assessmentCode}
+              onChange={(e) => setEditState((s) => ({ ...s, assessmentCode: e.target.value }))}
             />
           </label>
           <label className="block text-sm font-medium text-slate-700">
@@ -401,9 +411,18 @@ function AssessPageContent() {
             Weight (%)
             <input
               className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm"
-              placeholder="e.g. 40"
+              placeholder="e.g. 25%"
               value={editState.weight}
               onChange={(e) => setEditState((s) => ({ ...s, weight: e.target.value }))}
+            />
+          </label>
+          <label className="block text-sm font-medium text-slate-700">
+            Duration
+            <input
+              className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm"
+              placeholder="e.g. 1,500 Words or 240 Minutes"
+              value={editState.duration}
+              onChange={(e) => setEditState((s) => ({ ...s, duration: e.target.value }))}
             />
           </label>
           <div className="grid gap-4 sm:grid-cols-2">

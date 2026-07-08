@@ -337,12 +337,11 @@ create table public.assessments (
   id               uuid primary key default gen_random_uuid(),
   module_id        uuid not null references public.modules(id) on delete cascade,
   programme_id     uuid not null references public.programmes(id) on delete cascade,
+  assessment_code  text,            -- institutional reference code from CSV (e.g. "001")
   title            text not null,
-  type             text,
   description      text,
-  weight           numeric(5,2),    -- percentage, e.g. 40.00
-  assessment_code  text,            -- institutional reference code from CSV (e.g. "001"); display only
-  duration         text,            -- optional duration from CSV (e.g. "3 Hours"); display only
+  weight           text,            -- free-text weight from CSV/manual entry (e.g. "25%")
+  duration         text,            -- free-text duration from CSV/manual entry (e.g. "1,500 Words")
   priority_rating  text check (priority_rating in ('low', 'medium', 'high')),
   rag_status       text check (rag_status in ('red', 'amber', 'green')),  -- nullable: NULL for imported assessments not yet rated
   created_at       timestamptz not null default now(),
@@ -351,6 +350,23 @@ create table public.assessments (
 create index on public.assessments (module_id);
 create index on public.assessments (programme_id);
 alter table public.assessments enable row level security;
+
+-- Existing deployment migration (run once if assessments table already exists)
+alter table public.assessments
+  add column if not exists assessment_code text;
+
+alter table public.assessments
+  add column if not exists duration text;
+
+alter table public.assessments
+  alter column weight type text
+  using case
+    when weight is null then null
+    else regexp_replace(weight::text, '\\.?0+$', '') || '%'
+  end;
+
+alter table public.assessments
+  drop column if exists type;
 
 -- ─── ASSESSMENT LO LINKS ─────────────────────────────────────────────────────
 -- Many-to-many: which LOs are covered by which assessment
@@ -799,7 +815,7 @@ LAW4001, Public Law, 4, Yes, 30, Undergraduate, Level 4, "Bob Bobinson, Jack Jac
 
 **Assessment form** (inline or in side panel):
 
-- Title (required), Type (optional free text), Description (optional), Weight % (optional)
+- Assessment Code (optional), Title (required), Description (optional), Weight (optional), Duration (optional)
 - LOs (list LOs mapped to module, default all checked)
 - **Priority Rating:** Low / Medium / High (optional) — radio or segmented button. Tooltip: "How urgently does this assessment need to be reviewed for AI readiness?"
 - **RAG Status:** Red / Amber / Green (required when saving from the form) — colour-coded selector. Tooltip:
@@ -807,7 +823,7 @@ LAW4001, Public Law, 4, Yes, 30, Undergraduate, Level 4, "Bob Bobinson, Jack Jac
     - 🟡 Amber: Optional AI usage — students may use AI but are not required to
     - 🟢 Green: Mandatory AI usage — students are required to engage with AI as part of this assessment
 
-**Assessment card** shows: title, type, priority badge, RAG dot indicator, edit/delete icons (hidden for Viewers)
+**Assessment card** shows: assessment code, title, weight, duration, priority badge, RAG dot indicator, edit/delete icons (hidden for Viewers)
 
 **Summary view (top of tab):**
 

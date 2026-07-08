@@ -63,7 +63,7 @@ function parseAssessments(
           assessmentCode: assessmentCode ?? "",
           title,
           weight: weight ?? "",
-          duration: duration?.trim() || undefined,
+          duration: duration?.trim() ?? "",
         },
       ];
     });

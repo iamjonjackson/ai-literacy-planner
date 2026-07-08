@@ -68,10 +68,11 @@ type Assessment = {
   id: string;
   programmeId: string;
   moduleId: string;
+  assessmentCode: string;
   title: string;
-  type: string;
   description: string;
   weight: string;
+  duration: string;
   priority: PriorityRating | null;
   rag: RagStatus | null;
   learningOutcomeIds: string[];
@@ -88,7 +89,7 @@ type CsvModuleImportRow = {
   aims: string;
   url: string;
   learningOutcomes: Array<{ category: string; loNumber: string; text: string }>;
-  assessments: Array<{ assessmentCode: string; title: string; weight: string; duration?: string }>;
+  assessments: Array<{ assessmentCode: string; title: string; weight: string; duration: string }>;
 };
 
 type BackupPayload = {
@@ -152,12 +153,20 @@ type AppDataContextValue = {
   deleteLearningOutcome: (learningOutcomeId: string) => void;
   addAssessment: (
     programmeId: string,
-    input: { moduleId: string; title: string; rag: RagStatus; priority?: PriorityRating | null },
+    input: {
+      moduleId: string;
+      assessmentCode?: string;
+      title: string;
+      weight?: string;
+      duration?: string;
+      rag: RagStatus;
+      priority?: PriorityRating | null;
+    },
   ) => string;
   updateAssessment: (
     assessmentId: string,
     patch: Partial<
-      Pick<Assessment, "title" | "type" | "description" | "weight" | "priority" | "rag" | "learningOutcomeIds" | "moduleId">
+      Pick<Assessment, "assessmentCode" | "title" | "description" | "weight" | "duration" | "priority" | "rag" | "learningOutcomeIds" | "moduleId">
     >,
   ) => void;
   deleteAssessment: (assessmentId: string) => void;
@@ -389,24 +398,24 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
       }
 
       // Push modules
-      for (const module of pending.modules) {
+      for (const moduleRecord of pending.modules) {
         const { error } = await supabase.from("modules").upsert({
-          id: module.id,
-          programme_id: module.programmeId,
-          name: module.name,
-          code: module.code,
-          year: module.year,
-          order: module.order,
-          credits: module.credits,
-          description: module.description,
-          aims: module.aims,
-          scheme: module.scheme,
-          organiser: module.organiser,
-          url: module.url,
-          is_compulsory: module.isCompulsory,
-          updated_at: module.updatedAt,
+          id: moduleRecord.id,
+          programme_id: moduleRecord.programmeId,
+          name: moduleRecord.name,
+          code: moduleRecord.code,
+          year: moduleRecord.year,
+          order: moduleRecord.order,
+          credits: moduleRecord.credits,
+          description: moduleRecord.description,
+          aims: moduleRecord.aims,
+          scheme: moduleRecord.scheme,
+          organiser: moduleRecord.organiser,
+          url: moduleRecord.url,
+          is_compulsory: moduleRecord.isCompulsory,
+          updated_at: moduleRecord.updatedAt,
         });
-        if (!error) await markSynced("modules", module.id);
+        if (!error) await markSynced("modules", moduleRecord.id);
       }
 
       // Push learning outcomes
@@ -430,10 +439,11 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
           id: assessment.id,
           programme_id: assessment.programmeId,
           module_id: assessment.moduleId,
+          assessment_code: assessment.assessmentCode,
           title: assessment.title,
-          type: assessment.type,
           description: assessment.description,
           weight: assessment.weight,
+          duration: assessment.duration,
           priority_rating: assessment.priority?.toLowerCase() ?? null,
           rag_status: assessment.rag?.toLowerCase() ?? null,
           updated_at: assessment.updatedAt,
@@ -753,7 +763,15 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
   const addAssessment = useCallback(
     (
       programmeId: string,
-      input: { moduleId: string; title: string; rag: RagStatus; priority?: PriorityRating | null },
+      input: {
+        moduleId: string;
+        assessmentCode?: string;
+        title: string;
+        weight?: string;
+        duration?: string;
+        rag: RagStatus;
+        priority?: PriorityRating | null;
+      },
     ) => {
       const assessmentId = generateId();
       setState((current) => ({
@@ -765,10 +783,11 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
             id: assessmentId,
             programmeId,
             moduleId: input.moduleId,
+            assessmentCode: input.assessmentCode ?? "",
             title: input.title,
-            type: "",
             description: "",
-            weight: "",
+            weight: input.weight ?? "",
+            duration: input.duration ?? "",
             priority: input.priority ?? null,
             rag: input.rag,
             learningOutcomeIds: current.learningOutcomes
@@ -788,7 +807,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
       patch: Partial<
         Pick<
           Assessment,
-          "title" | "type" | "description" | "weight" | "priority" | "rag" | "learningOutcomeIds" | "moduleId"
+          "assessmentCode" | "title" | "description" | "weight" | "duration" | "priority" | "rag" | "learningOutcomeIds" | "moduleId"
         >
       >,
     ) => {
@@ -908,10 +927,11 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
             id: generateId(),
             programmeId,
             moduleId,
+            assessmentCode: a.assessmentCode,
             title: a.title,
-            type: a.assessmentCode ? `${a.assessmentCode}${a.duration ? ` · ${a.duration}` : ""}` : "",
             description: "",
             weight: a.weight,
+            duration: a.duration,
             priority: null,
             rag: null,
             learningOutcomeIds: moduleLoIds,
