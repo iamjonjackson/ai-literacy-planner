@@ -125,7 +125,7 @@ function AssessPageContent() {
 
   return (
     <div className="space-y-6">
-      <section className="grid gap-4 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm md:grid-cols-4">
+      <section className="sticky -top-4 z-20 grid gap-4 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm md:grid-cols-4 backdrop-blur supports-[backdrop-filter]:bg-white/90">
         <article className="rounded-2xl bg-slate-50 p-4">
           <p className="text-sm font-medium uppercase tracking-[0.2em] text-blue-600">Total assessments</p>
           <p className="mt-2 text-2xl font-semibold text-slate-900">{summary.total}</p>

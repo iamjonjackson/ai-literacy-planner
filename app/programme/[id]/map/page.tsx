@@ -123,7 +123,7 @@ function MapPageContent() {
         </div>
       </section>
 
-      <aside className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+      <aside className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm xl:sticky xl:-top-4 xl:self-start xl:max-h-[calc(100dvh-2rem)] xl:overflow-y-auto">
         <h3 className="text-lg font-semibold text-slate-900">New Learning Outcomes</h3>
         <p className="mt-2 text-sm text-slate-600">Assign each LO to a module.</p>
         <div className="mt-4 space-y-3">
