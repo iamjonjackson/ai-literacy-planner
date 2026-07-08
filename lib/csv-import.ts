@@ -1,5 +1,5 @@
 import Papa from "papaparse";
-import type { CsvModuleImportRow } from "@/lib/app-data";
+import type { CsvModuleImportRow, CsvProgrammeLearningOutcomeImportRow } from "@/lib/app-data";
 
 export type CsvPreviewRow = {
   code: string;
@@ -23,6 +23,18 @@ export type CsvParseResult = {
   preview: CsvPreviewRow[];
   skipped: CsvSkippedRow[];
   importRows: CsvModuleImportRow[];
+};
+
+export type CsvProgrammeLearningOutcomePreviewRow = {
+  loNumber: string;
+  category: string;
+  text: string;
+};
+
+export type ProgrammeLearningOutcomeCsvParseResult = {
+  preview: CsvProgrammeLearningOutcomePreviewRow[];
+  skipped: CsvSkippedRow[];
+  importRows: CsvProgrammeLearningOutcomeImportRow[];
 };
 
 function parseLearningOutcomes(
@@ -142,6 +154,53 @@ export async function parseCsvFile(
             learningOutcomes,
             assessments,
           });
+        }
+
+        resolve({ preview, skipped, importRows });
+      },
+      error(err) {
+        reject(new Error(err.message));
+      },
+    });
+  });
+}
+
+export async function parseProgrammeLearningOutcomesCsvFile(
+  file: File,
+): Promise<ProgrammeLearningOutcomeCsvParseResult> {
+  return new Promise((resolve, reject) => {
+    Papa.parse<Record<string, string>>(file, {
+      header: true,
+      skipEmptyLines: true,
+      transformHeader: (h) => h.trim().toLowerCase().replace(/\s+/g, "_"),
+      complete(results) {
+        const preview: CsvProgrammeLearningOutcomePreviewRow[] = [];
+        const skipped: CsvSkippedRow[] = [];
+        const importRows: CsvProgrammeLearningOutcomeImportRow[] = [];
+
+        for (const row of results.data) {
+          const loNumber = row["number"]?.trim() ?? "";
+          const category = row["type"]?.trim() ?? "";
+          const text = row["lo"]?.trim() ?? "";
+          const rawName = loNumber || category || text || "(blank row)";
+
+          if (!loNumber) {
+            skipped.push({ rawName, reason: "Missing number", skipped: true });
+            continue;
+          }
+
+          if (!category) {
+            skipped.push({ rawName, reason: "Missing type", skipped: true });
+            continue;
+          }
+
+          if (!text) {
+            skipped.push({ rawName, reason: "Missing LO", skipped: true });
+            continue;
+          }
+
+          preview.push({ loNumber, category, text });
+          importRows.push({ loNumber, category, text });
         }
 
         resolve({ preview, skipped, importRows });

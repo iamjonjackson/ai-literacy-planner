@@ -2,17 +2,51 @@
 
 import { Suspense, useMemo, useRef, useState } from "react";
 import { useParams, useSearchParams } from "next/navigation";
-import { useAppData, type Module } from "@/lib/app-data";
+import { useAppData, type LearningOutcome, type Module } from "@/lib/app-data";
 import { Modal, ConfirmModal } from "@/components/modal";
-import { parseCsvFile, type CsvPreviewRow, type CsvSkippedRow, type CsvParseResult } from "@/lib/csv-import";
+import {
+  parseCsvFile,
+  parseProgrammeLearningOutcomesCsvFile,
+  type CsvPreviewRow,
+  type CsvSkippedRow,
+  type CsvParseResult,
+  type CsvProgrammeLearningOutcomePreviewRow,
+  type ProgrammeLearningOutcomeCsvParseResult,
+} from "@/lib/csv-import";
 
-type ImportState =
+type ModuleImportState =
   | { stage: "idle" }
   | { stage: "preview"; result: CsvParseResult }
   | { stage: "importing"; total: number; done: number }
   | { stage: "done"; imported: number };
 
+type ProgrammeLearningOutcomeImportState =
+  | { stage: "idle" }
+  | { stage: "preview"; result: ProgrammeLearningOutcomeCsvParseResult }
+  | { stage: "importing"; total: number; done: number }
+  | { stage: "done"; imported: number };
+
 const BATCH_SIZE = 10;
+const loCategories = ["Disciplinary Skills", "Academic Content", "Attributes"] as const;
+
+function compareLoNumbers(left?: string, right?: string) {
+  const leftValue = left?.trim() ?? "";
+  const rightValue = right?.trim() ?? "";
+  const leftNumber = Number(leftValue);
+  const rightNumber = Number(rightValue);
+  const leftIsNumeric = leftValue.length > 0 && !Number.isNaN(leftNumber);
+  const rightIsNumeric = rightValue.length > 0 && !Number.isNaN(rightNumber);
+
+  if (leftIsNumeric && rightIsNumeric && leftNumber !== rightNumber) {
+    return leftNumber - rightNumber;
+  }
+
+  if (leftValue !== rightValue) {
+    return leftValue.localeCompare(rightValue, undefined, { numeric: true });
+  }
+
+  return 0;
+}
 
 type EditModuleState = {
   open: boolean;
@@ -36,6 +70,11 @@ type ResultState = {
   message: string;
 };
 
+type ProgrammeLearningOutcomeDraft = {
+  category: (typeof loCategories)[number];
+  text: string;
+};
+
 function PlanPageContent() {
   const params = useParams<{ id: string }>();
   const searchParams = useSearchParams();
@@ -46,6 +85,10 @@ function PlanPageContent() {
     deleteModule,
     updateModule,
     importCsvModules,
+    importProgrammeLearningOutcomes,
+    addLearningOutcome,
+    updateLearningOutcome,
+    deleteLearningOutcome,
     updateProgrammeYears,
     getModuleDeletionImpact,
     clearModulesForYear,
@@ -53,6 +96,11 @@ function PlanPageContent() {
   } = useAppData();
   const [draftByYear, setDraftByYear] = useState<Record<number, string>>({});
   const csvInputRef = useRef<HTMLInputElement>(null);
+  const programmeLoCsvInputRef = useRef<HTMLInputElement>(null);
+  const [programmeLoDraft, setProgrammeLoDraft] = useState<ProgrammeLearningOutcomeDraft>({
+    category: loCategories[0],
+    text: "",
+  });
 
   const [editState, setEditState] = useState<EditModuleState>({
     open: false,
@@ -78,13 +126,52 @@ function PlanPageContent() {
   }>({ open: false, module: null, message: "" });
 
   const [resultState, setResultState] = useState<ResultState>({ open: false, message: "" });
-  const [importState, setImportState] = useState<ImportState>({ stage: "idle" });
-  const [parseError, setParseError] = useState<string | null>(null);
+  const [moduleImportState, setModuleImportState] = useState<ModuleImportState>({ stage: "idle" });
+  const [programmeLoImportState, setProgrammeLoImportState] =
+    useState<ProgrammeLearningOutcomeImportState>({ stage: "idle" });
+  const [moduleParseError, setModuleParseError] = useState<string | null>(null);
+  const [programmeLoParseError, setProgrammeLoParseError] = useState<string | null>(null);
+  const [programmeLoDeleteConfirm, setProgrammeLoDeleteConfirm] = useState<{
+    open: boolean;
+    learningOutcome: LearningOutcome | null;
+  }>({ open: false, learningOutcome: null });
 
   const programme = state.programmes.find((record) => record.id === programmeId);
   const isViewer = programme?.role === "viewer";
   const modules = state.modules.filter((module) => module.programmeId === programmeId);
+  const programmeLearningOutcomes = useMemo(
+    () =>
+      state.learningOutcomes.filter(
+        (learningOutcome) =>
+          learningOutcome.programmeId === programmeId &&
+          learningOutcome.moduleId === null &&
+          learningOutcome.competencyId === null,
+      ),
+    [programmeId, state.learningOutcomes],
+  );
   const existingCodes = useMemo(() => new Set(modules.map((m) => m.code).filter(Boolean)), [modules]);
+  const orderedProgrammeLearningOutcomes = useMemo(() => {
+    return [...programmeLearningOutcomes].sort((left, right) => {
+      const numberComparison = compareLoNumbers(left.loNumber, right.loNumber);
+      if (numberComparison !== 0) {
+        return numberComparison;
+      }
+
+      return left.text.localeCompare(right.text);
+    });
+  }, [programmeLearningOutcomes]);
+  const nextProgrammeLoNumber = useMemo(() => {
+    const highestNumber = programmeLearningOutcomes.reduce<number>((currentMax, learningOutcome) => {
+      const parsedNumber = Number(learningOutcome.loNumber?.trim() ?? "");
+      if (Number.isNaN(parsedNumber)) {
+        return currentMax;
+      }
+
+      return Math.max(currentMax, parsedNumber);
+    }, 0);
+
+    return String(highestNumber + 1);
+  }, [programmeLearningOutcomes]);
 
   const modulesByYear = useMemo(() => {
     const grouped = new Map<number, typeof modules>();
@@ -227,44 +314,302 @@ function PlanPageContent() {
     const file = event.target.files?.[0];
     event.target.value = "";
     if (!file) return;
-    setParseError(null);
+    setModuleParseError(null);
     try {
       const result = await parseCsvFile(file, existingCodes);
       if (result.preview.length === 0 && result.skipped.length === 0) {
-        setParseError("No valid rows found in the CSV file.");
+        setModuleParseError("No valid rows found in the CSV file.");
         return;
       }
-      setImportState({ stage: "preview", result });
+      setModuleImportState({ stage: "preview", result });
     } catch (err) {
-      setParseError(err instanceof Error ? err.message : "Failed to parse CSV.");
+      setModuleParseError(err instanceof Error ? err.message : "Failed to parse CSV.");
+    }
+  };
+
+  const handleProgrammeLoCsvFile = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+    setProgrammeLoParseError(null);
+    try {
+      const result = await parseProgrammeLearningOutcomesCsvFile(file);
+      if (result.preview.length === 0 && result.skipped.length === 0) {
+        setProgrammeLoParseError("No valid rows found in the CSV file.");
+        return;
+      }
+      setProgrammeLoImportState({ stage: "preview", result });
+    } catch (err) {
+      setProgrammeLoParseError(err instanceof Error ? err.message : "Failed to parse CSV.");
     }
   };
 
   const runImport = async (rows: CsvParseResult["importRows"]) => {
     const total = rows.length;
-    setImportState({ stage: "importing", total, done: 0 });
+    setModuleImportState({ stage: "importing", total, done: 0 });
 
     let done = 0;
     while (done < total) {
       const batch = rows.slice(done, done + BATCH_SIZE);
       importCsvModules(programmeId, batch);
       done += batch.length;
-      setImportState({ stage: "importing", total, done });
+      setModuleImportState({ stage: "importing", total, done });
       await new Promise<void>((resolve) => setTimeout(resolve, 0));
     }
 
-    setImportState({ stage: "done", imported: total });
+    setModuleImportState({ stage: "done", imported: total });
   };
 
-  const stage = importState.stage;
+  const runProgrammeLoImport = async (
+    rows: ProgrammeLearningOutcomeCsvParseResult["importRows"],
+  ) => {
+    const total = rows.length;
+    setProgrammeLoImportState({ stage: "importing", total, done: 0 });
+
+    let done = 0;
+    while (done < total) {
+      const batch = rows.slice(done, done + BATCH_SIZE);
+      importProgrammeLearningOutcomes(programmeId, batch);
+      done += batch.length;
+      setProgrammeLoImportState({ stage: "importing", total, done });
+      await new Promise<void>((resolve) => setTimeout(resolve, 0));
+    }
+
+    setProgrammeLoImportState({ stage: "done", imported: total });
+  };
+
+  const moduleImportStage = moduleImportState.stage;
+  const programmeLoImportStage = programmeLoImportState.stage;
 
   return (
     <div className="space-y-6">
       <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
+            <p className="text-sm font-medium uppercase tracking-[0.2em] text-amber-600">
+              Programme learning outcomes
+            </p>
+            <h2 className="mt-2 text-2xl font-semibold text-slate-900">Programme Learning Outcomes</h2>
+          </div>
+          {!isViewer ? (
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                className="rounded-xl border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 hover:border-slate-400"
+                onClick={() => programmeLoCsvInputRef.current?.click()}
+              >
+                Import from CSV
+              </button>
+              <input
+                ref={programmeLoCsvInputRef}
+                type="file"
+                accept=".csv,text/csv"
+                className="hidden"
+                onChange={handleProgrammeLoCsvFile}
+              />
+            </div>
+          ) : null}
+        </div>
+
+        {programmeLoParseError ? (
+          <div className="mt-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+            {programmeLoParseError}
+          </div>
+        ) : null}
+
+        {programmeLoImportStage !== "idle" && (
+          <div className="mt-4 rounded-2xl border border-slate-200 p-4">
+            {programmeLoImportStage === "preview" && programmeLoImportState.stage === "preview" && (
+              <ProgrammeLearningOutcomeCsvPreviewPanel
+                result={programmeLoImportState.result}
+                onConfirm={() => {
+                  if (programmeLoImportState.stage === "preview") {
+                    runProgrammeLoImport(programmeLoImportState.result.importRows);
+                  }
+                }}
+                onCancel={() => setProgrammeLoImportState({ stage: "idle" })}
+              />
+            )}
+
+            {programmeLoImportStage === "importing" && programmeLoImportState.stage === "importing" && (
+              <div className="space-y-4">
+                <p className="font-semibold text-slate-900">Importing programme learning outcomes…</p>
+                <div className="h-3 rounded-full bg-slate-200">
+                  <div
+                    className="h-3 rounded-full bg-amber-500 transition-all"
+                    style={{
+                      width: `${Math.round((programmeLoImportState.done / programmeLoImportState.total) * 100)}%`,
+                    }}
+                  />
+                </div>
+                <p className="text-sm text-slate-600">
+                  Importing {programmeLoImportState.done} of {programmeLoImportState.total} learning outcomes…
+                </p>
+              </div>
+            )}
+
+            {programmeLoImportStage === "done" && programmeLoImportState.stage === "done" && (
+              <div className="space-y-3">
+                <p className="font-semibold text-slate-900">Import complete</p>
+                <p className="text-sm text-slate-600">
+                  {programmeLoImportState.imported} learning outcome
+                  {programmeLoImportState.imported !== 1 ? "s" : ""} imported successfully.
+                </p>
+                <button
+                  type="button"
+                  className="rounded-xl bg-amber-500 px-4 py-2 text-sm font-semibold text-white hover:bg-amber-600"
+                  onClick={() => setProgrammeLoImportState({ stage: "idle" })}
+                >
+                  Done
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+
+        <div className="mt-6 space-y-4">
+          {orderedProgrammeLearningOutcomes.length === 0 ? (
+            <p className="rounded-xl bg-slate-50 px-4 py-3 text-sm text-slate-600">
+              No programme learning outcomes yet.
+            </p>
+          ) : (
+            <div className="space-y-2">
+              {orderedProgrammeLearningOutcomes.map((learningOutcome) => {
+                const isMarkedForDeletion = learningOutcome.status === "to_delete";
+
+                return (
+                  <article
+                    key={learningOutcome.id}
+                    className={`rounded-xl border px-4 py-3 ${
+                      isMarkedForDeletion
+                        ? "border-amber-300 bg-amber-50"
+                        : "border-slate-200 bg-white"
+                    }`}
+                  >
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div className="min-w-0 max-w-10 flex-1 space-y-2">
+                        <div className="flex flex-wrap gap-2">
+                          {learningOutcome.loNumber ? (
+                            <span className="rounded-full bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-700">
+                              {learningOutcome.loNumber}
+                            </span>
+                          ) : null}
+                        </div>
+                      </div>
+
+                      <div className="min-w-0 flex-2 space-y-2 gap-2">
+                        <span className="inline-block text-sm leading-6 text-slate-700 mr-2">
+                          {learningOutcome.text}
+                        </span>
+                        {isMarkedForDeletion ? (
+                          <span className="rounded-full bg-amber-200 inline-block px-2 py-1 m-0 text-xs font-semibold text-amber-800">
+                            For deletion
+                          </span>
+                        ) : null}
+                      </div>
+
+                      {!isViewer ? (
+                        <div className="flex flex-wrap gap-2">
+                          <button
+                            type="button"
+                            className="rounded-full border border-red-200 px-3 py-1 text-xs font-semibold text-red-700"
+                            onClick={() =>
+                              setProgrammeLoDeleteConfirm({ open: true, learningOutcome })
+                            }
+                          >
+                            Delete
+                          </button>
+                          {isMarkedForDeletion ? (
+                            <button
+                              type="button"
+                              className="rounded-full border border-emerald-200 px-3 py-1 text-xs font-semibold text-emerald-700"
+                              onClick={() =>
+                                updateLearningOutcome(learningOutcome.id, { status: undefined })
+                              }
+                            >
+                              Restore
+                            </button>
+                          ) : (
+                            <button
+                              type="button"
+                              className="rounded-full border border-amber-200 px-3 py-1 text-xs font-semibold text-amber-700"
+                              onClick={() =>
+                                updateLearningOutcome(learningOutcome.id, { status: "to_delete" })
+                              }
+                            >
+                              Mark for deletion
+                            </button>
+                          )}
+                        </div>
+                      ) : null}
+                    </div>
+                  </article>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+
+        {!isViewer ? (
+          <form
+            className="mt-6 grid gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-4 md:grid-cols-[220px_minmax(0,1fr)_auto] md:items-start"
+            onSubmit={(event) => {
+              event.preventDefault();
+              const text = programmeLoDraft.text.trim();
+              if (!text) {
+                return;
+              }
+
+              addLearningOutcome(programmeId, {
+                competencyId: null,
+                text,
+                category: programmeLoDraft.category,
+                loNumber: nextProgrammeLoNumber,
+              });
+              setProgrammeLoDraft((current) => ({ ...current, text: "" }));
+            }}
+          >
+            <select
+              className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm"
+              value={programmeLoDraft.category}
+              onChange={(event) =>
+                setProgrammeLoDraft((current) => ({
+                  ...current,
+                  category: event.target.value as (typeof loCategories)[number],
+                }))
+              }
+            >
+              {loCategories.map((category) => (
+                <option key={category} value={category}>
+                  {category}
+                </option>
+              ))}
+            </select>
+            <textarea
+              className="min-h-24 rounded-xl border border-slate-200 px-3 py-2 text-sm"
+              placeholder={`Learning outcome #${nextProgrammeLoNumber}`}
+              value={programmeLoDraft.text}
+              onChange={(event) =>
+                setProgrammeLoDraft((current) => ({ ...current, text: event.target.value }))
+              }
+            />
+            <button
+              type="submit"
+              className="rounded-xl bg-amber-500 px-4 py-2 text-sm font-semibold text-white hover:bg-amber-600"
+            >
+              Add LO
+            </button>
+          </form>
+        ) : null}
+
+      </section>
+
+      <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
             <p className="text-sm font-medium uppercase tracking-[0.2em] text-blue-600">Programme structure</p>
-            <h2 className="mt-2 text-2xl font-semibold text-slate-900">Modules within scope</h2>
+            <h2 className="mt-2 text-2xl font-semibold text-slate-900">Modules within scope for review</h2>
           </div>
           <div className="flex flex-wrap gap-2">
             {!isViewer ? (
@@ -310,53 +655,53 @@ function PlanPageContent() {
         </div>
       </section>
 
-      {parseError && (
+      {moduleParseError && (
         <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-          {parseError}
+          {moduleParseError}
         </div>
       )}
 
-      {stage !== "idle" && (
+      {moduleImportStage !== "idle" && (
         <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-          {stage === "preview" && importState.stage === "preview" && (
+          {moduleImportStage === "preview" && moduleImportState.stage === "preview" && (
             <CsvPreviewPanel
-              result={importState.result}
+              result={moduleImportState.result}
               onConfirm={() => {
-                if (importState.stage === "preview") {
-                  runImport(importState.result.importRows);
+                if (moduleImportState.stage === "preview") {
+                  runImport(moduleImportState.result.importRows);
                 }
               }}
-              onCancel={() => setImportState({ stage: "idle" })}
+              onCancel={() => setModuleImportState({ stage: "idle" })}
             />
           )}
 
-          {stage === "importing" && importState.stage === "importing" && (
+          {moduleImportStage === "importing" && moduleImportState.stage === "importing" && (
             <div className="space-y-4">
               <p className="font-semibold text-slate-900">Importing modules…</p>
               <div className="h-3 rounded-full bg-slate-200">
                 <div
                   className="h-3 rounded-full bg-blue-600 transition-all"
                   style={{
-                    width: `${Math.round((importState.done / importState.total) * 100)}%`,
+                    width: `${Math.round((moduleImportState.done / moduleImportState.total) * 100)}%`,
                   }}
                 />
               </div>
               <p className="text-sm text-slate-600">
-                Importing {importState.done} of {importState.total} modules…
+                Importing {moduleImportState.done} of {moduleImportState.total} modules…
               </p>
             </div>
           )}
 
-          {stage === "done" && importState.stage === "done" && (
+          {moduleImportStage === "done" && moduleImportState.stage === "done" && (
             <div className="space-y-3">
               <p className="font-semibold text-slate-900">Import complete</p>
               <p className="text-sm text-slate-600">
-                {importState.imported} module{importState.imported !== 1 ? "s" : ""} imported successfully.
+                {moduleImportState.imported} module{moduleImportState.imported !== 1 ? "s" : ""} imported successfully.
               </p>
               <button
                 type="button"
                 className="rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700"
-                onClick={() => setImportState({ stage: "idle" })}
+                onClick={() => setModuleImportState({ stage: "idle" })}
               >
                 Done
               </button>
@@ -540,6 +885,19 @@ function PlanPageContent() {
         confirmLabel="Delete module"
       />
 
+      <ConfirmModal
+        open={programmeLoDeleteConfirm.open}
+        onClose={() => setProgrammeLoDeleteConfirm({ open: false, learningOutcome: null })}
+        onConfirm={() => {
+          if (programmeLoDeleteConfirm.learningOutcome) {
+            deleteLearningOutcome(programmeLoDeleteConfirm.learningOutcome.id);
+          }
+        }}
+        title="Delete learning outcome"
+        message="Are you sure?"
+        confirmLabel="Delete"
+      />
+
       {/* Bulk action confirmation */}
       <ConfirmModal
         open={bulkConfirm.open}
@@ -658,6 +1016,84 @@ function CsvPreviewPanel({
           onClick={onConfirm}
         >
           Confirm import ({preview.length} module{preview.length !== 1 ? "s" : ""})
+        </button>
+        <button
+          type="button"
+          className="rounded-xl border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:border-slate-400"
+          onClick={onCancel}
+        >
+          Cancel
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function ProgrammeLearningOutcomeCsvPreviewPanel({
+  result,
+  onConfirm,
+  onCancel,
+}: {
+  result: ProgrammeLearningOutcomeCsvParseResult;
+  onConfirm: () => void;
+  onCancel: () => void;
+}) {
+  const { preview, skipped } = result;
+
+  return (
+    <div className="space-y-4">
+      <div>
+        <p className="font-semibold text-slate-900">CSV preview</p>
+        <p className="mt-1 text-sm text-slate-600">
+          {preview.length} learning outcome{preview.length !== 1 ? "s" : ""} ready to import
+          {skipped.length > 0 && `, ${skipped.length} row${skipped.length !== 1 ? "s" : ""} will be skipped`}.
+        </p>
+      </div>
+
+      {preview.length > 0 && (
+        <div className="overflow-x-auto rounded-xl border border-slate-200">
+          <table className="w-full text-xs">
+            <thead className="bg-slate-50 text-left">
+              <tr>
+                <th className="px-3 py-2 font-semibold text-slate-700">Number</th>
+                <th className="px-3 py-2 font-semibold text-slate-700">Type</th>
+                <th className="px-3 py-2 font-semibold text-slate-700">LO</th>
+              </tr>
+            </thead>
+            <tbody>
+              {preview.map((row: CsvProgrammeLearningOutcomePreviewRow, index: number) => (
+                <tr key={`${row.category}-${row.loNumber}-${index}`} className="border-t border-slate-100">
+                  <td className="px-3 py-2 text-slate-600">{row.loNumber}</td>
+                  <td className="px-3 py-2 text-slate-600">{row.category}</td>
+                  <td className="px-3 py-2 text-slate-800">{row.text}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {skipped.length > 0 && (
+        <div className="rounded-xl border border-amber-200 bg-amber-50 p-3">
+          <p className="text-xs font-semibold text-amber-800">Skipped rows ({skipped.length})</p>
+          <ul className="mt-2 space-y-1">
+            {skipped.map((row: CsvSkippedRow, index: number) => (
+              <li key={index} className="text-xs text-amber-700">
+                <span className="font-medium">{row.rawName}</span>: {row.reason}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      <div className="flex gap-2">
+        <button
+          type="button"
+          className="rounded-xl bg-amber-500 px-4 py-2 text-sm font-semibold text-white hover:bg-amber-600 disabled:opacity-50"
+          disabled={preview.length === 0}
+          onClick={onConfirm}
+        >
+          Confirm import ({preview.length} learning outcome{preview.length !== 1 ? "s" : ""})
         </button>
         <button
           type="button"

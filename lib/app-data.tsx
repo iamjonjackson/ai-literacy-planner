@@ -59,6 +59,7 @@ type LearningOutcome = {
   moduleId: string | null;
   category?: string;
   loNumber?: string;
+  status?: "to_delete";
 };
 
 type PriorityRating = "Low" | "Medium" | "High";
@@ -90,6 +91,12 @@ type CsvModuleImportRow = {
   url: string;
   learningOutcomes: Array<{ category: string; loNumber: string; text: string }>;
   assessments: Array<{ assessmentCode: string; title: string; weight: string; duration: string }>;
+};
+
+type CsvProgrammeLearningOutcomeImportRow = {
+  loNumber: string;
+  category: string;
+  text: string;
 };
 
 type BackupPayload = {
@@ -144,11 +151,11 @@ type AppDataContextValue = {
   deleteModule: (moduleId: string) => ModuleDeletionImpact | null;
   addLearningOutcome: (
     programmeId: string,
-    input: { competencyId: string | null; text: string; category?: string },
+    input: { competencyId: string | null; text: string; category?: string; loNumber?: string },
   ) => string;
   updateLearningOutcome: (
     learningOutcomeId: string,
-    patch: Partial<Pick<LearningOutcome, "text" | "competencyId" | "moduleId" | "category">>,
+    patch: Partial<Pick<LearningOutcome, "text" | "competencyId" | "moduleId" | "category" | "loNumber" | "status">>,
   ) => void;
   deleteLearningOutcome: (learningOutcomeId: string) => void;
   addAssessment: (
@@ -173,6 +180,10 @@ type AppDataContextValue = {
   exportProgrammeBackup: (programmeId: string) => BackupPayload | null;
   importProgrammeBackup: (payload: BackupPayload) => string;
   importCsvModules: (programmeId: string, rows: CsvModuleImportRow[]) => void;
+  importProgrammeLearningOutcomes: (
+    programmeId: string,
+    rows: CsvProgrammeLearningOutcomeImportRow[],
+  ) => void;
 };
 
 const initialState: AppDataState = {
@@ -693,7 +704,10 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const addLearningOutcome = useCallback(
-    (programmeId: string, input: { competencyId: string | null; text: string; category?: string }) => {
+    (
+      programmeId: string,
+      input: { competencyId: string | null; text: string; category?: string; loNumber?: string },
+    ) => {
       const learningOutcomeId = generateId();
       setState((current) => ({
         ...current,
@@ -707,6 +721,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
             text: input.text,
             moduleId: null,
             category: input.category,
+            loNumber: input.loNumber,
           },
         ],
       }));
@@ -719,7 +734,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
   const updateLearningOutcome = useCallback(
     (
       learningOutcomeId: string,
-      patch: Partial<Pick<LearningOutcome, "text" | "competencyId" | "moduleId" | "category">>,
+      patch: Partial<Pick<LearningOutcome, "text" | "competencyId" | "moduleId" | "category" | "loNumber" | "status">>,
     ) => {
       setState((current) => {
         const target = current.learningOutcomes.find((learningOutcome) => learningOutcome.id === learningOutcomeId);
@@ -949,6 +964,28 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
     });
   }, []);
 
+  const importProgrammeLearningOutcomes = useCallback(
+    (programmeId: string, rows: CsvProgrammeLearningOutcomeImportRow[]) => {
+      setState((current) => ({
+        ...current,
+        programmes: touchProgramme(current.programmes, programmeId),
+        learningOutcomes: [
+          ...current.learningOutcomes,
+          ...rows.map((row) => ({
+            id: generateId(),
+            programmeId,
+            competencyId: null,
+            text: row.text,
+            moduleId: null,
+            category: row.category,
+            loNumber: row.loNumber,
+          })),
+        ],
+      }));
+    },
+    [],
+  );
+
   const exportProgrammeBackup = useCallback(
     (programmeId: string) => {
       const programme = state.programmes.find((record) => record.id === programmeId);
@@ -1049,6 +1086,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
       exportProgrammeBackup,
       importProgrammeBackup,
       importCsvModules,
+      importProgrammeLearningOutcomes,
     }),
     [
       state,
@@ -1075,6 +1113,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
       exportProgrammeBackup,
       importProgrammeBackup,
       importCsvModules,
+      importProgrammeLearningOutcomes,
     ],
   );
 
@@ -1097,6 +1136,7 @@ export type {
   Assessment,
   BackupPayload,
   CsvModuleImportRow,
+  CsvProgrammeLearningOutcomeImportRow,
   ModuleDeletionImpact,
   BulkModuleDeletionResult,
 };

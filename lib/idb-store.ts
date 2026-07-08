@@ -43,6 +43,7 @@ export type IdbLearningOutcome = {
   moduleId: string | null;
   category?: string;
   loNumber?: string;
+  status?: "to_delete";
   updatedAt: string;
   syncStatus: SyncStatus;
   localUpdatedAt: string;

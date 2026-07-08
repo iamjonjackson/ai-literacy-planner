@@ -320,9 +320,10 @@ create table public.learning_outcomes (
   programme_id   uuid not null references public.programmes(id) on delete cascade,
   competency_id  text,          -- e.g. "1.1"; NULL for LOs imported from CSV before mapping
   category       text,          -- institutional category from CSV (e.g. "Disciplinary Skills"); NULL for manually-authored LOs
-  lo_number      int,           -- position within category from CSV; NULL for manually-authored LOs
+  lo_number      text,          -- position / label within category from CSV or manual entry; NULL when not supplied
   text           text not null,
   module_id      uuid references public.modules(id) on delete set null,
+  status         text check (status in ('to_delete')), -- NULL for active LOs; set when flagged for removal but retained in UI/history
   "order"        int not null default 0,
   created_at     timestamptz not null default now(),
   updated_at     timestamptz not null default now()
