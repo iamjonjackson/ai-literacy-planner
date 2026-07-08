@@ -62,7 +62,7 @@ function DesignPageContent() {
 
   return (
     <div className="space-y-6">
-      <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+      <section className="sticky -top-4 z-20 rounded-3xl border border-slate-200 bg-white/95 p-6 shadow-sm backdrop-blur supports-[backdrop-filter]:bg-white/90">
         <div className="flex items-end justify-between gap-4">
           <div>
             <p className="text-sm font-medium uppercase tracking-[0.2em] text-blue-600">Coverage tracker</p>
