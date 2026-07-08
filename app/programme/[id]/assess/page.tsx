@@ -38,6 +38,7 @@ function AssessPageContent() {
   const programmeId = searchParams.get("programme") ?? params.id;
   const { state, addAssessment, updateAssessment, deleteAssessment } = useAppData();
   const [drafts, setDrafts] = useState<Record<string, { title: string; rag: RagStatus }>>({});
+  const [openAddFormForModuleId, setOpenAddFormForModuleId] = useState<string | null>(null);
   const [editState, setEditState] = useState<EditAssessmentState>(emptyEdit);
 
   const modules = state.modules.filter((module) => module.programmeId === programmeId);
@@ -180,6 +181,7 @@ function AssessPageContent() {
               {yearModules.map((module) => {
                 const moduleAssessments = assessments.filter((assessment) => assessment.moduleId === module.id);
                 const draft = drafts[module.id] ?? { title: "", rag: "Amber" };
+                const isAddFormOpen = openAddFormForModuleId === module.id;
 
                 return (
                   <article key={module.id} className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
@@ -214,7 +216,7 @@ function AssessPageContent() {
                                 <h3 className="font-semibold text-slate-900">{assessment.title}</h3>
                                 <p className="text-sm text-slate-600">
                                   {[
-                                    assessment.assessmentCode ? `Code ${assessment.assessmentCode}` : "",
+                                    assessment.assessmentCode ? `${assessment.assessmentCode}` : "",
                                     assessment.weight,
                                     assessment.duration,
                                   ].filter((value) => value.trim() !== "").join(" · ") || "Assessment details not set"}
@@ -245,7 +247,7 @@ function AssessPageContent() {
                                           : "bg-slate-100 text-slate-700"
                                   }`}
                                 >
-                                  {assessment.rag === "" ? "Missing AI taxonomy" : assessment.rag}
+                                  {!assessment.rag ? "Missing AI taxonomy" : assessment.rag}
                                 </span>
                               </div>
                             </div>
@@ -271,7 +273,17 @@ function AssessPageContent() {
                           </article>
                         ))}
                         
-                        {!isViewer ? (
+                        {!isViewer && !isAddFormOpen ? (
+                          <button
+                            type="button"
+                            className="mt-4 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-100"
+                            onClick={() => setOpenAddFormForModuleId(module.id)}
+                          >
+                            Add assessment
+                          </button>
+                        ) : null}
+
+                        {!isViewer && isAddFormOpen ? (
                           <form
                             className="mt-4 rounded-xl bg-slate-50 p-4"
                             onSubmit={(event) => {
@@ -290,9 +302,20 @@ function AssessPageContent() {
                                 ...current,
                                 [module.id]: { title: "", rag: "Amber" },
                               }));
+
+                              setOpenAddFormForModuleId(null);
                             }}
                           >
-                            <h3 className="text-sm font-semibold text-slate-700">Add assessment</h3>
+                            <div className="flex items-center justify-between gap-2">
+                              <h3 className="text-sm font-semibold text-slate-700">Add assessment</h3>
+                              <button
+                                type="button"
+                                className="text-sm font-medium text-slate-600 hover:text-slate-900"
+                                onClick={() => setOpenAddFormForModuleId(null)}
+                              >
+                                Cancel
+                              </button>
+                            </div>
                             <div className="mt-3 grid gap-2 md:grid-cols-[1fr_180px_auto]">
                               <input
                                 className="rounded-lg border border-slate-200 px-3 py-2 text-sm"
