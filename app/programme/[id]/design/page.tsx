@@ -5,13 +5,18 @@ import { useParams, useSearchParams } from "next/navigation";
 import { frameworkCompetencies, findDimension } from "@/lib/framework";
 import { useAppData } from "@/lib/app-data";
 import { usePersistentState } from "@/lib/persistent-state";
-import { Modal } from "@/components/modal";
+import { Modal, ConfirmModal } from "@/components/modal";
 
 type EditLoState = {
   open: boolean;
   loId: string;
   text: string;
   category: (typeof loCategories)[number];
+};
+
+type DeleteLoState = {
+  open: boolean;
+  loId: string;
 };
 
 const loCategories = ["Disciplinary Skills", "Academic Content", "Attributes"] as const;
@@ -28,6 +33,7 @@ function DesignPageContent() {
   const [draft, setDraft] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<(typeof loCategories)[number]>(loCategories[0]);
   const [editLo, setEditLo] = useState<EditLoState>({ open: false, loId: "", text: "", category: loCategories[0] });
+  const [deleteLo, setDeleteLo] = useState<DeleteLoState>({ open: false, loId: "" });
 
   const learningOutcomes = state.learningOutcomes.filter((learningOutcome) => learningOutcome.programmeId === programmeId);
   const programme = state.programmes.find((record) => record.id === programmeId);
@@ -191,7 +197,7 @@ function DesignPageContent() {
                       <button
                         type="button"
                         className="rounded-full border border-red-200 px-3 py-1 text-xs font-semibold text-red-700"
-                        onClick={() => deleteLearningOutcome(learningOutcome.id)}
+                        onClick={() => setDeleteLo({ open: true, loId: learningOutcome.id })}
                       >
                         Delete
                       </button>
@@ -375,6 +381,19 @@ function DesignPageContent() {
           </div>
         </form>
       </Modal>
+
+      <ConfirmModal
+        open={deleteLo.open}
+        onClose={() => setDeleteLo({ open: false, loId: "" })}
+        onConfirm={() => {
+          if (deleteLo.loId) {
+            deleteLearningOutcome(deleteLo.loId);
+          }
+        }}
+        title="Delete learning outcome"
+        message="Are you sure?"
+        confirmLabel="Delete"
+      />
     </div>
   );
 }

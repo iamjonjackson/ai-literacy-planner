@@ -3,7 +3,7 @@
 import { Suspense, useMemo, useState } from "react";
 import { useParams, useSearchParams } from "next/navigation";
 import { useAppData, type PriorityRating, type RagStatus } from "@/lib/app-data";
-import { Modal } from "@/components/modal";
+import { Modal, ConfirmModal } from "@/components/modal";
 
 const priorities: PriorityRating[] = ["High", "Medium", "Low"];
 const rags: RagStatus[] = ["", "Red", "Amber", "Green"];
@@ -32,6 +32,11 @@ const emptyEdit: EditAssessmentState = {
   rag: "Amber",
 };
 
+type DeleteAssessmentState = {
+  open: boolean;
+  id: string;
+};
+
 function AssessPageContent() {
   const params = useParams<{ id: string }>();
   const searchParams = useSearchParams();
@@ -40,6 +45,7 @@ function AssessPageContent() {
   const [drafts, setDrafts] = useState<Record<string, { title: string; rag: RagStatus }>>({});
   const [openAddFormForModuleId, setOpenAddFormForModuleId] = useState<string | null>(null);
   const [editState, setEditState] = useState<EditAssessmentState>(emptyEdit);
+  const [deleteAssessmentState, setDeleteAssessmentState] = useState<DeleteAssessmentState>({ open: false, id: "" });
 
   const modules = state.modules.filter((module) => module.programmeId === programmeId);
   const modulesByYear = useMemo(() => {
@@ -264,7 +270,7 @@ function AssessPageContent() {
                                 <button
                                   type="button"
                                   className="rounded-full border border-red-200 px-3 py-1 text-xs font-semibold text-red-700"
-                                  onClick={() => deleteAssessment(assessment.id)}
+                                  onClick={() => setDeleteAssessmentState({ open: true, id: assessment.id })}
                                 >
                                   Delete
                                 </button>
@@ -495,6 +501,19 @@ function AssessPageContent() {
           </div>
         </form>
       </Modal>
+
+      <ConfirmModal
+        open={deleteAssessmentState.open}
+        onClose={() => setDeleteAssessmentState({ open: false, id: "" })}
+        onConfirm={() => {
+          if (deleteAssessmentState.id) {
+            deleteAssessment(deleteAssessmentState.id);
+          }
+        }}
+        title="Delete assessment"
+        message="Are you sure?"
+        confirmLabel="Delete"
+      />
     </div>
   );
 }

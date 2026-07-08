@@ -234,10 +234,10 @@ function PlanPageContent() {
 
     const msg =
       impact.mappedLearningOutcomeCount > 0
-        ? `This module has ${impact.mappedLearningOutcomeCount} LO${
+        ? `Are you sure? This module has ${impact.mappedLearningOutcomeCount} LO${
             impact.mappedLearningOutcomeCount !== 1 ? "s" : ""
           } mapped to it. They will be unmapped (not deleted). Delete this module?`
-        : "Delete this module?";
+        : "Are you sure you want to delete this module? This cannot be undone.";
 
     setDeleteConfirm({ open: true, module, message: msg });
   };
