@@ -239,7 +239,7 @@ function DesignPageContent() {
                 minLength={10}
                 value={draft}
                 onChange={(event) => setDraft(event.target.value)}
-                placeholder="Write a measurable programme learning outcome (minimum 10 characters)."
+                placeholder="Write a measurable learning outcome (minimum 10 characters)."
               />
               <button className="rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700" type="submit">
                 Save LO
