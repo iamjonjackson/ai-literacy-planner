@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 import { AppDataProvider } from "@/lib/app-data";
 import { AuthProvider } from "@/lib/auth";
+import { Analytics } from "@vercel/analytics/next"
 
 export const metadata: Metadata = {
   title: "AI Literacy Programme Redesign Tool",
@@ -20,6 +21,7 @@ export default function RootLayout({
           <AuthProvider>
             <AppDataProvider>{children}</AppDataProvider>
           </AuthProvider>
+          <Analytics />
         </body>
       </html>
     );
