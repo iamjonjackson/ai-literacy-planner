@@ -46,39 +46,46 @@ export function SiteHeader() {
     <header className="border-b border-[var(--border)] bg-white">
       <div className="mx-auto flex w-full max-w-7xl items-center justify-between gap-4 px-6 py-4">
         <div>
-          <Link href="/dashboard" className="text-lg font-semibold text-slate-900">
-            AI Literacy Programme Redesign Tool
-          </Link>
+          {session ? (
+            <Link href="/dashboard" className="text-lg font-semibold text-slate-900">
+              AI Literacy Programme Redesign Tool
+            </Link>
+          ) : (
+            <>
+              <h2 className="text-lg font-semibold text-slate-900">AI Literacy Programme Redesign Tool</h2>
+            </>
+          )}
           {/* <p className="text-sm text-slate-600">AI literacy planning workspace.</p> */}
         </div>
         <nav className="flex items-center gap-3 text-sm font-medium text-slate-600">
-          <span
-            title={syncTitle}
-            className={`rounded-full px-3 py-2 text-xs font-semibold ${syncClass}`}
-          >
-            {syncLabel}
-          </span>
 
-          <Link className="rounded-full bg-blue-200 px-4 py-2 text-white hover:bg-blue-300" href="/dashboard">
-            Dashboard
-          </Link>
           {session ? (
             <>
+              <span
+                title={syncTitle}
+                className={`rounded-full px-3 py-2 text-xs font-semibold ${syncClass}`}
+              >
+                {syncLabel}
+              </span>
+              <Link className="rounded-full bg-blue-200 px-4 py-2 text-white text-xs hover:bg-blue-300" href="/dashboard">
+                Dashboard
+              </Link>
               <span className="rounded-full bg-slate-100 px-3 py-2 text-xs font-semibold text-slate-700 truncate max-w-40">
                 {user?.email}
               </span>
               <button
                 type="button"
-                className="rounded-full border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                className="rounded-full border border-slate-300 px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50"
                 onClick={() => signOut()}
               >
                 Logout
               </button>
             </>
           ) : (
-            <Link className="rounded-full border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50" href="/login">
-              Login
-            </Link>
+            // <Link className="rounded-full border border-slate-300 px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50" href="/login">
+            //   Login
+            // </Link>
+            <></>
           )}
         </nav>
       </div>

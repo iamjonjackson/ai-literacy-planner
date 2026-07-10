@@ -172,7 +172,17 @@ function MapPageContent() {
                                           </button>
                                         )}
                                       </div>
-                                    ) : null}
+                                    ) : (
+                                      <>
+                                        {isMarkedForDeletion ? (
+                                          <div className="mt-2 flex flex-wrap gap-2">
+                                            <span className="mt-2 inline-block rounded-full bg-amber-200 px-2 py-1 m-0 text-xs font-semibold text-amber-800">
+                                              For deletion
+                                            </span>
+                                          </div>
+                                        ) : null}
+                                      </>
+                                    )}
                                   </span>
                                 );
                               })}
