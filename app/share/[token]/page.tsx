@@ -19,7 +19,7 @@ export default function ShareTokenPage() {
 
     supabase
       .from("programmes")
-      .select("id")
+      .select("id, name")
       .eq("public_access_enabled", true)
       .eq("public_access_token", token)
       .maybeSingle()
@@ -27,6 +27,16 @@ export default function ShareTokenPage() {
         if (error || !data?.id) {
           setErrorMessage("This shared link is invalid or no longer active.");
           return;
+        }
+
+        if (typeof window !== "undefined") {
+          window.sessionStorage.setItem("ai-literacy-planner:public-token", token);
+          if (typeof data.name === "string" && data.name.trim()) {
+            window.sessionStorage.setItem(
+              `ai-literacy-planner:public-programme-name:${data.id}`,
+              data.name,
+            );
+          }
         }
 
         const nextUrl = buildProgrammeRoute(data.id, "explore", { publicToken: token });

@@ -17,6 +17,7 @@ type ProgrammeShellProps = {
 export function ProgrammeShell({ programmeId, children }: ProgrammeShellProps) {
   const searchParams = useSearchParams();
   const resolvedProgrammeId = searchParams.get("programme") ?? programmeId;
+  const publicToken = searchParams.get("publicToken");
   const {
     state,
     isPublicSharedView,
@@ -25,7 +26,13 @@ export function ProgrammeShell({ programmeId, children }: ProgrammeShellProps) {
     getProgrammeShareUrl,
   } = useAppData();
   const programme = state.programmes.find((record) => record.id === resolvedProgrammeId);
-  const programmeName = programme?.name ?? formatProgrammeName(resolvedProgrammeId);
+  const cachedSharedProgrammeName =
+    typeof window !== "undefined"
+      ? window.sessionStorage.getItem(`ai-literacy-planner:public-programme-name:${resolvedProgrammeId}`)
+      : null;
+  const programmeName = programme?.name
+    ?? cachedSharedProgrammeName
+    ?? (publicToken ? "Opening shared programme..." : formatProgrammeName(resolvedProgrammeId));
   const canManageShare =
     programme?.role === "owner" &&
     !isPublicSharedView &&

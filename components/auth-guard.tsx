@@ -9,9 +9,10 @@ export function AuthGuard({ children }: { children: ReactNode }) {
   const { session, loading, configured } = useAuth();
   const router = useRouter();
   const requireAuth = process.env.NEXT_PUBLIC_REQUIRE_AUTH === "true";
-  const hasPublicToken =
-    typeof window !== "undefined" &&
-    Boolean(new URLSearchParams(window.location.search).get("publicToken"));
+  const hasPublicToken = typeof window !== "undefined" && (
+    Boolean(new URLSearchParams(window.location.search).get("publicToken")) ||
+    Boolean(window.sessionStorage.getItem("ai-literacy-planner:public-token"))
+  );
 
   useEffect(() => {
     if (!loading && configured && !session && !hasPublicToken) {
