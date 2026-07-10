@@ -53,6 +53,7 @@ type Module = {
   organiser?: string;
   url?: string;
   isCompulsory?: boolean;
+  updatedAt: string;
 };
 
 type LearningOutcome = {
@@ -64,6 +65,7 @@ type LearningOutcome = {
   category?: string;
   loNumber?: string;
   status?: "to_delete";
+  updatedAt: string;
 };
 
 type PriorityRating = "Low" | "Medium" | "High";
@@ -82,6 +84,7 @@ type Assessment = {
   rag: RagStatus | null;
   status?: "to_delete";
   learningOutcomeIds: string[];
+  updatedAt: string;
 };
 
 type CsvModuleImportRow = {
@@ -431,6 +434,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
     }
   });
   const lastPullAtRef = useRef(0);
+  const publicRefreshInFlightRef = useRef(false);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -514,26 +518,29 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
   const sharedQueryProgrammeId = searchParams.get("programme");
   const sharedRouteKey = `${sharedToken ?? ""}|${sharedQueryProgrammeId ?? ""}`;
 
-  useEffect(() => {
-    if (!isSupabaseConfigured()) {
-      return;
+  const loadPublicProgrammeSnapshot = useCallback(async () => {
+    if (!isSupabaseConfigured() || !sharedToken) {
+      return null;
     }
 
-    if (!sharedToken) {
-      return;
+    if (publicRefreshInFlightRef.current) {
+      return null;
     }
 
-    if (loadedPublicRef.current === sharedRouteKey) {
-      return;
+    if (isOffline) {
+      setSyncState("offline");
+      return null;
     }
-
-    loadedPublicRef.current = sharedRouteKey;
 
     const supabase = getSupabaseClient();
     if (!supabase) {
-      return;
+      return null;
     }
-    void (async () => {
+
+    publicRefreshInFlightRef.current = true;
+    setSyncState("syncing");
+
+    try {
       let programmeId = sharedQueryProgrammeId;
 
       if (!programmeId) {
@@ -545,7 +552,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
           .maybeSingle();
 
         if (byTokenError || !byTokenProgramme?.id) {
-          return;
+          return null;
         }
 
         programmeId = byTokenProgramme.id as string;
@@ -560,7 +567,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
         .single();
 
       if (error || !programme) {
-        return;
+        return null;
       }
 
       const [modulesRes, learningOutcomesRes, assessmentsRes] = await Promise.all([
@@ -596,6 +603,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
         organiser: (m.organiser as string | undefined) ?? undefined,
         url: (m.url as string | undefined) ?? undefined,
         isCompulsory: (m.is_compulsory as boolean | undefined) ?? undefined,
+        updatedAt: (m.updated_at as string) ?? new Date().toISOString(),
       }));
 
       const mappedLearningOutcomes: LearningOutcome[] = (learningOutcomesRes.data ?? []).map(
@@ -608,6 +616,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
           category: (lo.category as string | undefined) ?? undefined,
           loNumber: (lo.lo_number as string | undefined) ?? undefined,
           status: (lo.status as "to_delete" | undefined) ?? undefined,
+          updatedAt: (lo.updated_at as string) ?? new Date().toISOString(),
         }),
       );
 
@@ -625,6 +634,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
           rag: fromDbRag((assessment.rag_status as string | null) ?? null),
           status: (assessment.status as "to_delete" | undefined) ?? undefined,
           learningOutcomeIds: [],
+          updatedAt: (assessment.updated_at as string) ?? new Date().toISOString(),
         }),
       );
 
@@ -636,8 +646,52 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
       });
       setIsPublicSharedView(true);
       setSharedProgrammeId(programmeId);
-    })();
-  }, [sharedQueryProgrammeId, sharedRouteKey, sharedToken]);
+
+      return programmeId;
+    } catch {
+      return null;
+    } finally {
+      publicRefreshInFlightRef.current = false;
+      setSyncState((current) => (current === "offline" ? current : "idle"));
+    }
+  }, [isOffline, sharedQueryProgrammeId, sharedToken]);
+
+  useEffect(() => {
+    if (!sharedToken || !isSupabaseConfigured()) {
+      return;
+    }
+
+    if (loadedPublicRef.current === sharedRouteKey) {
+      return;
+    }
+
+    loadedPublicRef.current = sharedRouteKey;
+    const initialLoadTimeout = setTimeout(() => {
+      void loadPublicProgrammeSnapshot();
+    }, 0);
+
+    return () => {
+      clearTimeout(initialLoadTimeout);
+    };
+  }, [loadPublicProgrammeSnapshot, sharedRouteKey, sharedToken]);
+
+  useEffect(() => {
+    if (!sharedToken || !isSupabaseConfigured()) {
+      return;
+    }
+
+    const initialPollTimeout = setTimeout(() => {
+      void loadPublicProgrammeSnapshot();
+    }, 0);
+    const refreshInterval = setInterval(() => {
+      void loadPublicProgrammeSnapshot();
+    }, 10000);
+
+    return () => {
+      clearTimeout(initialPollTimeout);
+      clearInterval(refreshInterval);
+    };
+  }, [loadPublicProgrammeSnapshot, sharedRouteKey, sharedToken]);
 
   // ── Persist to IndexedDB whenever state changes ───────────────────────────
   useEffect(() => {
@@ -742,17 +796,17 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
     saveAllToIdb({
       programmes: state.programmes.map((p) => ({
         ...p,
-        syncStatus: (dirtyProgrammeSet.has(p.id) ? "pending" : "synced") as const,
+        syncStatus: dirtyProgrammeSet.has(p.id) ? "pending" : "synced",
         localUpdatedAt: dirtyProgrammeSet.has(p.id) ? ts : p.updatedAt,
       })) as IdbProgramme[],
       modules: state.modules.map((m) => ({
         ...m,
-        syncStatus: (dirtyModuleSet.has(m.id) ? "pending" : "synced") as const,
+        syncStatus: dirtyModuleSet.has(m.id) ? "pending" : "synced",
         localUpdatedAt: dirtyModuleSet.has(m.id) ? ts : m.updatedAt,
       })) as IdbModule[],
       learningOutcomes: state.learningOutcomes.map((lo) => ({
         ...lo,
-        syncStatus: (dirtyLoSet.has(lo.id) ? "pending" : "synced") as const,
+        syncStatus: dirtyLoSet.has(lo.id) ? "pending" : "synced",
         localUpdatedAt: dirtyLoSet.has(lo.id) ? ts : lo.updatedAt,
       })) as IdbLearningOutcome[],
       assessments: state.assessments.map((a) => {
@@ -764,7 +818,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
         return {
           ...assessment,
           rag,
-          syncStatus: (dirtyAssessmentSet.has(a.id) ? "pending" : "synced") as const,
+          syncStatus: dirtyAssessmentSet.has(a.id) ? "pending" : "synced",
           localUpdatedAt: dirtyAssessmentSet.has(a.id) ? ts : assessment.updatedAt,
         } as IdbAssessment;
       }) as IdbAssessment[],
@@ -1298,23 +1352,26 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
         }
       }
 
-      const mappedProgrammes: IdbProgramme[] = pulledProgrammeRows.map((p: Record<string, unknown>) => ({
+      const mappedProgrammes: IdbProgramme[] = pulledProgrammeRows.map((p: Record<string, unknown>) => {
+        const role: Programme["role"] =
+          (p.owner_id as string | undefined) === user.id
+            ? "owner"
+            : (accessByProgramme.get(p.id as string) ?? "viewer");
+
+        return {
         id: p.id as string,
         name: p.name as string,
         description: (p.description as string) ?? "",
         years: (p.years as number) ?? 1,
         ownerId: (p.owner_id as string | undefined) ?? undefined,
         ownerEmail: (p.owner_email as string) ?? "",
-        role:
-          (p.owner_id as string | undefined) === user.id
-            ? "owner"
-            : (accessByProgramme.get(p.id as string) ?? "viewer"),
+        role,
         publicAccessEnabled: Boolean(p.public_access_enabled),
         publicAccessToken: (p.public_access_token as string | null) ?? null,
         updatedAt: (p.updated_at as string) ?? new Date().toISOString(),
         syncStatus: "synced" as const,
         localUpdatedAt: (p.updated_at as string) ?? new Date().toISOString(),
-      })).filter(
+      }}).filter(
         (programme) =>
           !(pendingProgrammeDeletes.includes(programme.id) && programme.ownerId === user.id),
       );
@@ -1700,6 +1757,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
               credits: "",
               description: "",
               order: siblings.length,
+              updatedAt: new Date().toISOString(),
             },
           ],
         };
@@ -1721,7 +1779,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
           ...current,
           programmes: touchProgramme(current.programmes, target.programmeId),
           modules: current.modules.map((module) =>
-            module.id === moduleId ? { ...module, ...patch } : module,
+            module.id === moduleId ? { ...module, ...patch, updatedAt: new Date().toISOString() } : module,
           ),
         };
       });
@@ -1768,6 +1826,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
               moduleId: null,
               category: input.category,
               loNumber: input.loNumber,
+              updatedAt: new Date().toISOString(),
             },
           ],
         };
@@ -1793,7 +1852,9 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
           ...current,
           programmes: touchProgramme(current.programmes, target.programmeId),
           learningOutcomes: current.learningOutcomes.map((learningOutcome) =>
-            learningOutcome.id === learningOutcomeId ? { ...learningOutcome, ...patch } : learningOutcome,
+            learningOutcome.id === learningOutcomeId
+              ? { ...learningOutcome, ...patch, updatedAt: new Date().toISOString() }
+              : learningOutcome,
           ),
         };
       });
@@ -1860,6 +1921,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
               learningOutcomeIds: current.learningOutcomes
                 .filter((learningOutcome) => learningOutcome.moduleId === input.moduleId)
                 .map((learningOutcome) => learningOutcome.id),
+              updatedAt: new Date().toISOString(),
             },
           ],
         };
@@ -1889,7 +1951,9 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
           ...current,
           programmes: touchProgramme(current.programmes, target.programmeId),
           assessments: current.assessments.map((assessment) =>
-            assessment.id === assessmentId ? { ...assessment, ...patch } : assessment,
+            assessment.id === assessmentId
+              ? { ...assessment, ...patch, updatedAt: new Date().toISOString() }
+              : assessment,
           ),
         };
       });
@@ -1944,6 +2008,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
                   organiser: row.organiser,
                   aims: row.aims,
                   url: row.url,
+                  updatedAt: new Date().toISOString(),
                 }
               : m,
           );
@@ -1974,6 +2039,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
             organiser: row.organiser,
             aims: row.aims,
             url: row.url,
+            updatedAt: new Date().toISOString(),
           });
         }
 
@@ -1987,6 +2053,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
             moduleId,
             category: lo.category,
             loNumber: lo.loNumber,
+            updatedAt: new Date().toISOString(),
           });
         }
 
@@ -2007,6 +2074,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
             priority: null,
             rag: null,
             learningOutcomeIds: moduleLoIds,
+            updatedAt: new Date().toISOString(),
           });
         }
       }
@@ -2041,6 +2109,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
               moduleId: null,
               category: row.category,
               loNumber: row.loNumber,
+              updatedAt: new Date().toISOString(),
             })),
           ],
         };
