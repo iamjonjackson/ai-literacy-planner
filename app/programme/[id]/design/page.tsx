@@ -184,7 +184,7 @@ function DesignPageContent() {
             ) : (
               competencyOutcomes.map((learningOutcome) => (
                 <article key={learningOutcome.id} className="rounded-xl border border-slate-200 p-4">
-                  <p className="text-sm leading-6 text-slate-700">{learningOutcome.text}</p>
+                  <p className="text-sm leading-6 text-slate-700">({learningOutcome.category}) {learningOutcome.text}</p>
                   {!isViewer ? (
                     <div className="mt-3 flex flex-wrap gap-2">
                       <button
