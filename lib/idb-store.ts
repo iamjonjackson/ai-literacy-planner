@@ -9,6 +9,7 @@ export type IdbProgramme = {
   name: string;
   description: string;
   years: number;
+  aiAgentUrl?: string;
   ownerId?: string;
   ownerEmail: string;
   role: "owner" | "editor" | "viewer";

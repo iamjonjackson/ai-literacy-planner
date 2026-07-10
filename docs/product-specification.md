@@ -226,6 +226,7 @@ create table public.programmes (
   name        text not null,
   description text,
   years       int not null default 3 check (years >= 1),
+  ai_agent_url text,
   public_access_enabled boolean not null default false,
   public_access_token text,
   created_at  timestamptz not null default now(),
@@ -398,6 +399,9 @@ create index on public.assessments (programme_id);
 alter table public.assessments enable row level security;
 
 -- Existing deployment migration (run once if assessments table already exists)
+alter table public.programmes
+  add column if not exists ai_agent_url text;
+
 alter table public.assessments
   add column if not exists assessment_code text;
 
@@ -674,7 +678,7 @@ localUpdatedAt: string             // ISO 8601 — time of last local write
 
 ### 8.2 Global Layout
 
-- **Top navbar:** App logo/name · Programme switcher dropdown (lists all programmes the user owns or has access to) · "New Programme" button · Current programme name · **Share button** (owner only) · **Logged-in user email + Sign Out**
+- **Top navbar:** App logo/name · Programme switcher dropdown (lists all programmes the user owns or has access to) · "New Programme" button · Current programme name · **AI Agent button** (visible to all programme roles when `ai_agent_url` is set; opens in a new tab) · **Share button** (owner only) · **Logged-in user email + Sign Out**
 - **Tab bar** (below navbar, within a programme): Explore · Design · Plan · Map · Assess · Implement — all always accessible, no locking
 - **Sidebar** (optional, collapsible): contextual help pulled from `/content/help/[tab].md`
 - **Offline indicator:** A subtle banner or icon in the navbar when the app detects no network connection, with a count of pending unsynced changes

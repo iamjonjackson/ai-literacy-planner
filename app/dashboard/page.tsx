@@ -23,6 +23,7 @@ type EditProgrammeState = {
   name: string;
   description: string;
   years: number;
+  aiAgentUrl: string;
 };
 
 type DeleteProgrammeState = {
@@ -46,6 +47,7 @@ export default function DashboardPage() {
     name: "",
     description: "",
     years: 3,
+    aiAgentUrl: "",
   });
 
   const [deleteState, setDeleteState] = useState<DeleteProgrammeState>({
@@ -110,15 +112,18 @@ export default function DashboardPage() {
       name: programme.name,
       description: programme.description,
       years: programme.years,
+      aiAgentUrl: programme.aiAgentUrl ?? "",
     });
   };
 
   const handleEditSave = () => {
     if (!editState.programme || !editState.name.trim()) return;
+    const aiAgentUrl = editState.aiAgentUrl.trim();
     updateProgramme(editState.programme.id, {
       name: editState.name.trim(),
       description: editState.description.trim(),
       years: Math.max(1, editState.years),
+      aiAgentUrl: aiAgentUrl.length > 0 ? aiAgentUrl : "",
     });
     setEditState((s) => ({ ...s, open: false }));
   };
@@ -336,6 +341,16 @@ export default function DashboardPage() {
               min={1}
               value={editState.years}
               onChange={(e) => setEditState((s) => ({ ...s, years: Number(e.target.value) }))}
+            />
+          </label>
+          <label className="block text-sm font-medium text-slate-700">
+            AI Agent URL (optional)
+            <input
+              className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm"
+              type="url"
+              placeholder="https://example.com/agent"
+              value={editState.aiAgentUrl}
+              onChange={(e) => setEditState((s) => ({ ...s, aiAgentUrl: e.target.value }))}
             />
           </label>
           <div className="flex justify-end gap-3 pt-2">

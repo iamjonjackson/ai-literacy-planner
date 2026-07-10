@@ -30,6 +30,7 @@ type Programme = {
   name: string;
   description: string;
   years: number;
+  aiAgentUrl?: string;
   ownerId?: string;
   ownerEmail: string;
   role: "owner" | "editor" | "viewer";
@@ -157,7 +158,7 @@ type AppDataContextValue = {
   sharedProgrammeId: string | null;
   isViewOnly: (programmeId: string) => boolean;
   createProgramme: (input: { name: string; description: string; years: number }) => string;
-  updateProgramme: (programmeId: string, patch: Partial<Pick<Programme, "name" | "description" | "years">>) => void;
+  updateProgramme: (programmeId: string, patch: Partial<Pick<Programme, "name" | "description" | "years" | "aiAgentUrl">>) => void;
   setProgrammePublicAccess: (programmeId: string, enabled: boolean) => void;
   getProgrammeShareUrl: (programmeId: string) => string | null;
   renameProgramme: (programmeId: string, name: string) => void;
@@ -241,6 +242,7 @@ function getDefaultSampleProgramme(): Programme {
     name: "Sample Programme",
     description: "Starter programme for UNESCO AI competency planning.",
     years: 3,
+    aiAgentUrl: "",
     ownerEmail: "owner@example.edu",
     role: "owner",
     publicAccessEnabled: false,
@@ -586,6 +588,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
         name: programme.name as string,
         description: (programme.description as string) ?? "",
         years: (programme.years as number) ?? 1,
+        aiAgentUrl: (programme.ai_agent_url as string) ?? "",
         ownerId: (programme.owner_id as string | undefined) ?? undefined,
         ownerEmail: (programme.owner_email as string) ?? "",
         role: "viewer",
@@ -1068,6 +1071,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
           name: programme.name,
           description: programme.description,
           years: programme.years,
+          ai_agent_url: programme.aiAgentUrl?.trim() ? programme.aiAgentUrl.trim() : null,
           public_access_enabled: programme.publicAccessEnabled ?? false,
           public_access_token: programme.publicAccessToken ?? null,
           updated_at: programme.updatedAt,
@@ -1080,6 +1084,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
             name: payload.name,
             description: payload.description,
             years: payload.years,
+            ai_agent_url: payload.ai_agent_url,
             public_access_enabled: payload.public_access_enabled,
             public_access_token: payload.public_access_token,
             updated_at: payload.updated_at,
@@ -1373,6 +1378,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
         name: p.name as string,
         description: (p.description as string) ?? "",
         years: (p.years as number) ?? 1,
+        aiAgentUrl: (p.ai_agent_url as string) ?? "",
         ownerId: (p.owner_id as string | undefined) ?? undefined,
         ownerEmail: (p.owner_email as string) ?? "",
         role,
@@ -1601,6 +1607,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
         name: input.name,
         description: input.description,
         years: input.years,
+        aiAgentUrl: "",
         ownerEmail: "owner@example.edu",
         role: "owner",
         publicAccessEnabled: false,
@@ -1615,7 +1622,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
   );
 
   const updateProgramme = useCallback(
-    (programmeId: string, patch: Partial<Pick<Programme, "name" | "description" | "years">>) => {
+    (programmeId: string, patch: Partial<Pick<Programme, "name" | "description" | "years" | "aiAgentUrl">>) => {
       setState((current) => ({
         ...current,
         programmes: canEditProgrammeInState(current, programmeId)
