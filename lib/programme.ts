@@ -11,6 +11,10 @@ export const programmeTabs = [
 
 export type ProgrammeTab = (typeof programmeTabs)[number]["slug"];
 
+type BuildProgrammeRouteOptions = {
+  publicToken?: string | null;
+};
+
 export function formatProgrammeName(id: string) {
   return id
     .split("-")
@@ -19,13 +23,24 @@ export function formatProgrammeName(id: string) {
     .join(" ");
 }
 
-export function buildProgrammeRoute(id: string, tab: ProgrammeTab) {
+export function buildProgrammeRoute(
+  id: string,
+  tab: ProgrammeTab,
+  options?: BuildProgrammeRouteOptions,
+) {
   const base = `/programme/${demoProgrammeId}/${tab}`;
-  if (id === demoProgrammeId) {
-    return base;
+  const params = new URLSearchParams();
+
+  if (id !== demoProgrammeId) {
+    params.set("programme", id);
   }
 
-  return `${base}?programme=${encodeURIComponent(id)}`;
+  if (options?.publicToken) {
+    params.set("publicToken", options.publicToken);
+  }
+
+  const qs = params.toString();
+  return qs ? `${base}?${qs}` : base;
 }
 
 export function getStaticProgrammeParams() {

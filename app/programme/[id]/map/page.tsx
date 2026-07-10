@@ -18,6 +18,26 @@ function MapPageContent() {
   const isViewer = programme?.role === "viewer";
   const learningOutcomes = state.learningOutcomes.filter((learningOutcome) => learningOutcome.programmeId === programmeId);
 
+  const compareLearningOutcomes = (
+    a: { loNumber?: string; text: string; id: string; category?: string },
+    b: { loNumber?: string; text: string; id: string; category?: string },
+  ) => {
+    const loA = a.loNumber ?? "";
+    const loB = b.loNumber ?? "";
+    const loNumberDiff = loA.localeCompare(loB, undefined, { numeric: true, sensitivity: "base" });
+    if (loNumberDiff !== 0) return loNumberDiff;
+
+    const categoryDiff = (a.category ?? "").localeCompare(b.category ?? "", undefined, {
+      sensitivity: "base",
+    });
+    if (categoryDiff !== 0) return categoryDiff;
+
+    const textDiff = a.text.localeCompare(b.text, undefined, { sensitivity: "base" });
+    if (textDiff !== 0) return textDiff;
+
+    return a.id.localeCompare(b.id);
+  };
+
   const newLearningOutcomes = learningOutcomes.filter((learningOutcome) => learningOutcome.competencyId);
   const activeNewLearningOutcomes = newLearningOutcomes.filter(
     (learningOutcome) => learningOutcome.status !== "to_delete",
@@ -36,6 +56,9 @@ function MapPageContent() {
 
     const list = outcomesByModule.get(learningOutcome.moduleId) ?? [];
     outcomesByModule.set(learningOutcome.moduleId, [...list, learningOutcome]);
+  });
+  outcomesByModule.forEach((list, moduleId) => {
+    outcomesByModule.set(moduleId, [...list].sort(compareLearningOutcomes));
   });
 
   return (
@@ -172,7 +195,7 @@ function MapPageContent() {
           {newLearningOutcomes.length === 0 ? (
             <p className="text-sm text-slate-500">No learning outcomes yet.</p>
           ) : (
-            newLearningOutcomes.map((learningOutcome) => {
+            [...newLearningOutcomes].sort(compareLearningOutcomes).map((learningOutcome) => {
               // const competency = frameworkCompetencies.find((record) => record.id === learningOutcome.competencyId);
 
               return (

@@ -17,9 +17,22 @@ type ProgrammeShellProps = {
 export function ProgrammeShell({ programmeId, children }: ProgrammeShellProps) {
   const searchParams = useSearchParams();
   const resolvedProgrammeId = searchParams.get("programme") ?? programmeId;
-  const { state } = useAppData();
+  const {
+    state,
+    isPublicSharedView,
+    isViewOnly,
+    setProgrammePublicAccess,
+    getProgrammeShareUrl,
+  } = useAppData();
   const programme = state.programmes.find((record) => record.id === resolvedProgrammeId);
   const programmeName = programme?.name ?? formatProgrammeName(resolvedProgrammeId);
+  const canManageShare =
+    programme?.role === "owner" &&
+    !isPublicSharedView &&
+    programme.id !== "sample-programme" &&
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(programme.id);
+  const viewOnly = isViewOnly(resolvedProgrammeId);
+  const shareUrl = getProgrammeShareUrl(resolvedProgrammeId);
   const [shareOpen, setShareOpen] = useState(false);
 
   return (
@@ -34,8 +47,7 @@ export function ProgrammeShell({ programmeId, children }: ProgrammeShellProps) {
               </div>
             </div>
             <div className="flex flex-wrap items-center gap-3 text-sm">
-{/* 
-              {programme?.role === "owner" ? (
+              {canManageShare ? (
                 <button
                   type="button"
                   className="rounded-full border border-blue-200 bg-blue-50 px-4 py-2 font-medium text-blue-700 hover:bg-blue-100"
@@ -45,11 +57,11 @@ export function ProgrammeShell({ programmeId, children }: ProgrammeShellProps) {
                 </button>
               ) : null}
               <span className="rounded-full bg-slate-100 px-4 py-2 font-medium text-slate-700">
-                {programme?.role ?? "owner"}
-              </span> */}
+                {viewOnly ? "viewer" : programme?.role ?? "owner"}
+              </span>
             </div>
           </div>
-          {programme?.role === "viewer" ? (
+          {viewOnly ? (
             <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
               You have view-only access to this programme.
             </div>
@@ -65,6 +77,10 @@ export function ProgrammeShell({ programmeId, children }: ProgrammeShellProps) {
           onClose={() => setShareOpen(false)}
           programmeId={resolvedProgrammeId}
           programmeName={programmeName}
+          canManagePublic={canManageShare}
+          isPublicEnabled={Boolean(programme.publicAccessEnabled)}
+          shareUrl={shareUrl}
+          onTogglePublic={(enabled) => setProgrammePublicAccess(resolvedProgrammeId, enabled)}
         />
       ) : null}
     </AuthGuard>

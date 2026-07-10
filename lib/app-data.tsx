@@ -10,6 +10,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import { useSearchParams } from "next/navigation";
 import { demoProgrammeId } from "@/lib/programme";
 import {
   loadAllFromIdb,
@@ -22,15 +23,18 @@ import {
   type IdbLearningOutcome,
   type IdbAssessment,
 } from "@/lib/idb-store";
-import { getSupabaseClient } from "@/lib/supabase";
+import { getSupabaseClient, isSupabaseConfigured } from "@/lib/supabase";
 
 type Programme = {
   id: string;
   name: string;
   description: string;
   years: number;
+  ownerId?: string;
   ownerEmail: string;
   role: "owner" | "editor" | "viewer";
+  publicAccessEnabled?: boolean;
+  publicAccessToken?: string | null;
   updatedAt: string;
 };
 
@@ -134,13 +138,25 @@ type AppDataState = {
 
 type SyncState = "idle" | "syncing" | "offline";
 
+type PullCursors = {
+  programmes: string | null;
+  modules: string | null;
+  learningOutcomes: string | null;
+  assessments: string | null;
+};
+
 type AppDataContextValue = {
   state: AppDataState;
   isOffline: boolean;
   syncState: SyncState;
   pendingCount: number;
+  isPublicSharedView: boolean;
+  sharedProgrammeId: string | null;
+  isViewOnly: (programmeId: string) => boolean;
   createProgramme: (input: { name: string; description: string; years: number }) => string;
   updateProgramme: (programmeId: string, patch: Partial<Pick<Programme, "name" | "description" | "years">>) => void;
+  setProgrammePublicAccess: (programmeId: string, enabled: boolean) => void;
+  getProgrammeShareUrl: (programmeId: string) => string | null;
   renameProgramme: (programmeId: string, name: string) => void;
   updateProgrammeYears: (programmeId: string, years: number) => void;
   deleteProgramme: (programmeId: string) => void;
@@ -188,17 +204,7 @@ type AppDataContextValue = {
 };
 
 const initialState: AppDataState = {
-  programmes: [
-    {
-      id: demoProgrammeId,
-      name: "Sample Programme",
-      description: "Starter programme for UNESCO AI competency planning.",
-      years: 3,
-      ownerEmail: "owner@example.edu",
-      role: "owner",
-      updatedAt: new Date().toISOString(),
-    },
-  ],
+  programmes: [],
   modules: [],
   learningOutcomes: [],
   assessments: [],
@@ -224,6 +230,42 @@ function touchProgramme(programmes: Programme[], programmeId: string) {
   return programmes.map((programme) =>
     programme.id === programmeId ? { ...programme, updatedAt: new Date().toISOString() } : programme,
   );
+}
+
+function getDefaultSampleProgramme(): Programme {
+  return {
+    id: demoProgrammeId,
+    name: "Sample Programme",
+    description: "Starter programme for UNESCO AI competency planning.",
+    years: 3,
+    ownerEmail: "owner@example.edu",
+    role: "owner",
+    publicAccessEnabled: false,
+    publicAccessToken: null,
+    updatedAt: new Date().toISOString(),
+  };
+}
+
+function fromDbPriority(value: string | null | undefined): PriorityRating | null {
+  if (!value) return null;
+  const normalized = value.toLowerCase();
+  if (normalized === "low") return "Low";
+  if (normalized === "medium") return "Medium";
+  if (normalized === "high") return "High";
+  return null;
+}
+
+function fromDbRag(value: string | null | undefined): "Red" | "Amber" | "Green" | null {
+  if (!value) return null;
+  const normalized = value.toLowerCase();
+  if (normalized === "red") return "Red";
+  if (normalized === "amber") return "Amber";
+  if (normalized === "green") return "Green";
+  return null;
+}
+
+function isUuidLike(value: string) {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
 }
 
 function getModuleDeletionImpactFromState(
@@ -299,12 +341,132 @@ function deleteModulesFromState(
 }
 
 export function AppDataProvider({ children }: { children: ReactNode }) {
+  const searchParams = useSearchParams();
   const [state, setState] = useState<AppDataState>(initialState);
   const [isOffline, setIsOffline] = useState(false);
   const [syncState, setSyncState] = useState<SyncState>("idle");
   const [pendingCount, setPendingCount] = useState(0);
+  const [isPublicSharedView, setIsPublicSharedView] = useState(false);
+  const [sharedProgrammeId, setSharedProgrammeId] = useState<string | null>(null);
   const idbLoadedRef = useRef(false);
+  const loadedPublicRef = useRef<string | null>(null);
   const syncIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const prevStateRef = useRef<AppDataState>(initialState);
+  const initialPullDoneRef = useRef(false);
+  const changeTrackingReadyRef = useRef(false);
+  const suppressChangeTrackingRef = useRef(false);
+  const [dirtyProgrammes, setDirtyProgrammes] = useState<string[]>([]);
+  const [dirtyModules, setDirtyModules] = useState<string[]>([]);
+  const [dirtyLearningOutcomes, setDirtyLearningOutcomes] = useState<string[]>([]);
+  const [dirtyAssessments, setDirtyAssessments] = useState<string[]>([]);
+  const [pendingProgrammeDeletes, setPendingProgrammeDeletes] = useState<string[]>(() => {
+    if (typeof window === "undefined") {
+      return [];
+    }
+
+    try {
+      const raw = window.localStorage.getItem("ai-literacy-planner:pending-programme-deletes");
+      if (!raw) {
+        return [];
+      }
+
+      const ids = JSON.parse(raw) as string[];
+      return Array.isArray(ids) ? ids.filter((id) => typeof id === "string") : [];
+    } catch {
+      return [];
+    }
+  });
+  const [pendingModuleDeletes, setPendingModuleDeletes] = useState<string[]>(() => {
+    if (typeof window === "undefined") return [];
+    try {
+      const raw = window.localStorage.getItem("ai-literacy-planner:pending-module-deletes");
+      if (!raw) return [];
+      const ids = JSON.parse(raw) as string[];
+      return Array.isArray(ids) ? ids.filter((id) => typeof id === "string") : [];
+    } catch {
+      return [];
+    }
+  });
+  const [pendingLearningOutcomeDeletes, setPendingLearningOutcomeDeletes] = useState<string[]>(() => {
+    if (typeof window === "undefined") return [];
+    try {
+      const raw = window.localStorage.getItem("ai-literacy-planner:pending-lo-deletes");
+      if (!raw) return [];
+      const ids = JSON.parse(raw) as string[];
+      return Array.isArray(ids) ? ids.filter((id) => typeof id === "string") : [];
+    } catch {
+      return [];
+    }
+  });
+  const [pendingAssessmentDeletes, setPendingAssessmentDeletes] = useState<string[]>(() => {
+    if (typeof window === "undefined") return [];
+    try {
+      const raw = window.localStorage.getItem("ai-literacy-planner:pending-assessment-deletes");
+      if (!raw) return [];
+      const ids = JSON.parse(raw) as string[];
+      return Array.isArray(ids) ? ids.filter((id) => typeof id === "string") : [];
+    } catch {
+      return [];
+    }
+  });
+  const [pullCursors, setPullCursors] = useState<PullCursors>(() => {
+    if (typeof window === "undefined") {
+      return { programmes: null, modules: null, learningOutcomes: null, assessments: null };
+    }
+
+    try {
+      const raw = window.localStorage.getItem("ai-literacy-planner:pull-cursors");
+      if (!raw) {
+        return { programmes: null, modules: null, learningOutcomes: null, assessments: null };
+      }
+      const parsed = JSON.parse(raw) as Partial<PullCursors>;
+      return {
+        programmes: parsed.programmes ?? null,
+        modules: parsed.modules ?? null,
+        learningOutcomes: parsed.learningOutcomes ?? null,
+        assessments: parsed.assessments ?? null,
+      };
+    } catch {
+      return { programmes: null, modules: null, learningOutcomes: null, assessments: null };
+    }
+  });
+  const lastPullAtRef = useRef(0);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      window.localStorage.setItem(
+        "ai-literacy-planner:pending-programme-deletes",
+        JSON.stringify(pendingProgrammeDeletes),
+      );
+    } catch {
+      // ignore storage errors
+    }
+  }, [pendingProgrammeDeletes]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      window.localStorage.setItem("ai-literacy-planner:pending-module-deletes", JSON.stringify(pendingModuleDeletes));
+      window.localStorage.setItem("ai-literacy-planner:pending-lo-deletes", JSON.stringify(pendingLearningOutcomeDeletes));
+      window.localStorage.setItem("ai-literacy-planner:pending-assessment-deletes", JSON.stringify(pendingAssessmentDeletes));
+      window.localStorage.setItem("ai-literacy-planner:pull-cursors", JSON.stringify(pullCursors));
+    } catch {
+      // ignore storage errors
+    }
+  }, [pendingAssessmentDeletes, pendingLearningOutcomeDeletes, pendingModuleDeletes, pullCursors]);
+
+  const isViewOnly = useCallback(
+    (programmeId: string) => {
+      if (isPublicSharedView && sharedProgrammeId === programmeId) {
+        return true;
+      }
+
+      const programme = state.programmes.find((record) => record.id === programmeId);
+      return programme?.role === "viewer";
+    },
+    [isPublicSharedView, sharedProgrammeId, state.programmes],
+  );
 
   // ── Load from IndexedDB on mount ──────────────────────────────────────────
   useEffect(() => {
@@ -319,12 +481,27 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
           learningOutcomes.length > 0 ||
           assessments.length > 0
         ) {
+          suppressChangeTrackingRef.current = true;
           setState({
             programmes: programmes.map(idbRecordToState),
             modules: modules.map(idbRecordToState),
             learningOutcomes: learningOutcomes.map(idbRecordToState),
             assessments: assessments.map(idbRecordToState),
           });
+          return;
+        }
+
+        if (typeof window !== "undefined") {
+          const seededKey = "ai-literacy-planner:sample-seeded";
+          const alreadySeeded = window.localStorage.getItem(seededKey) === "true";
+          if (!alreadySeeded) {
+            suppressChangeTrackingRef.current = true;
+            setState((current) => ({
+              ...current,
+              programmes: [getDefaultSampleProgramme(), ...current.programmes],
+            }));
+            window.localStorage.setItem(seededKey, "true");
+          }
         }
       })
       .catch(() => {
@@ -332,32 +509,274 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
       });
   }, []);
 
+  // ── Public shared programme loader (readonly) ────────────────────────────
+  const sharedToken = searchParams.get("publicToken");
+  const sharedQueryProgrammeId = searchParams.get("programme");
+  const sharedRouteKey = `${sharedToken ?? ""}|${sharedQueryProgrammeId ?? ""}`;
+
+  useEffect(() => {
+    if (!isSupabaseConfigured()) {
+      return;
+    }
+
+    if (!sharedToken) {
+      return;
+    }
+
+    if (loadedPublicRef.current === sharedRouteKey) {
+      return;
+    }
+
+    loadedPublicRef.current = sharedRouteKey;
+
+    const supabase = getSupabaseClient();
+    if (!supabase) {
+      return;
+    }
+    void (async () => {
+      let programmeId = sharedQueryProgrammeId;
+
+      if (!programmeId) {
+        const { data: byTokenProgramme, error: byTokenError } = await supabase
+          .from("programmes")
+          .select("id")
+          .eq("public_access_enabled", true)
+          .eq("public_access_token", sharedToken)
+          .maybeSingle();
+
+        if (byTokenError || !byTokenProgramme?.id) {
+          return;
+        }
+
+        programmeId = byTokenProgramme.id as string;
+      }
+
+      const { data: programme, error } = await supabase
+        .from("programmes")
+        .select("*")
+        .eq("id", programmeId)
+        .eq("public_access_enabled", true)
+        .eq("public_access_token", sharedToken)
+        .single();
+
+      if (error || !programme) {
+        return;
+      }
+
+      const [modulesRes, learningOutcomesRes, assessmentsRes] = await Promise.all([
+        supabase.from("modules").select("*").eq("programme_id", programmeId),
+        supabase.from("learning_outcomes").select("*").eq("programme_id", programmeId),
+        supabase.from("assessments").select("*").eq("programme_id", programmeId),
+      ]);
+
+      const mappedProgramme: Programme = {
+        id: programme.id as string,
+        name: programme.name as string,
+        description: (programme.description as string) ?? "",
+        years: (programme.years as number) ?? 1,
+        ownerId: (programme.owner_id as string | undefined) ?? undefined,
+        ownerEmail: (programme.owner_email as string) ?? "",
+        role: "viewer",
+        publicAccessEnabled: Boolean(programme.public_access_enabled),
+        publicAccessToken: (programme.public_access_token as string | null) ?? null,
+        updatedAt: (programme.updated_at as string) ?? new Date().toISOString(),
+      };
+
+      const mappedModules: Module[] = (modulesRes.data ?? []).map((m: Record<string, unknown>) => ({
+        id: m.id as string,
+        programmeId: m.programme_id as string,
+        year: m.year as number,
+        name: m.name as string,
+        code: (m.code as string) ?? "",
+        credits: (m.credits as string) ?? "",
+        description: (m.description as string) ?? "",
+        order: (m.order as number) ?? 0,
+        aims: (m.aims as string | undefined) ?? undefined,
+        scheme: (m.scheme as string | undefined) ?? undefined,
+        organiser: (m.organiser as string | undefined) ?? undefined,
+        url: (m.url as string | undefined) ?? undefined,
+        isCompulsory: (m.is_compulsory as boolean | undefined) ?? undefined,
+      }));
+
+      const mappedLearningOutcomes: LearningOutcome[] = (learningOutcomesRes.data ?? []).map(
+        (lo: Record<string, unknown>) => ({
+          id: lo.id as string,
+          programmeId: lo.programme_id as string,
+          competencyId: (lo.competency_id as string | null) ?? null,
+          text: lo.text as string,
+          moduleId: (lo.module_id as string | null) ?? null,
+          category: (lo.category as string | undefined) ?? undefined,
+          loNumber: (lo.lo_number as string | undefined) ?? undefined,
+          status: (lo.status as "to_delete" | undefined) ?? undefined,
+        }),
+      );
+
+      const mappedAssessments: Assessment[] = (assessmentsRes.data ?? []).map(
+        (assessment: Record<string, unknown>) => ({
+          id: assessment.id as string,
+          programmeId: assessment.programme_id as string,
+          moduleId: assessment.module_id as string,
+          assessmentCode: (assessment.assessment_code as string) ?? "",
+          title: assessment.title as string,
+          description: (assessment.description as string) ?? "",
+          weight: (assessment.weight as string) ?? "",
+          duration: (assessment.duration as string) ?? "",
+          priority: fromDbPriority((assessment.priority_rating as string | null) ?? null),
+          rag: fromDbRag((assessment.rag_status as string | null) ?? null),
+          status: (assessment.status as "to_delete" | undefined) ?? undefined,
+          learningOutcomeIds: [],
+        }),
+      );
+
+      setState({
+        programmes: [mappedProgramme],
+        modules: mappedModules,
+        learningOutcomes: mappedLearningOutcomes,
+        assessments: mappedAssessments,
+      });
+      setIsPublicSharedView(true);
+      setSharedProgrammeId(programmeId);
+    })();
+  }, [sharedQueryProgrammeId, sharedRouteKey, sharedToken]);
+
   // ── Persist to IndexedDB whenever state changes ───────────────────────────
   useEffect(() => {
+    if (isPublicSharedView) {
+      return;
+    }
+
+    if (!changeTrackingReadyRef.current) {
+      prevStateRef.current = state;
+      changeTrackingReadyRef.current = true;
+      return;
+    }
+
+    if (suppressChangeTrackingRef.current) {
+      prevStateRef.current = state;
+      suppressChangeTrackingRef.current = false;
+      return;
+    }
+
+    const prev = prevStateRef.current;
+    const nextProgrammeIds = new Set(state.programmes.map((item) => item.id));
+    const nextModuleIds = new Set(state.modules.map((item) => item.id));
+    const nextLoIds = new Set(state.learningOutcomes.map((item) => item.id));
+    const nextAssessmentIds = new Set(state.assessments.map((item) => item.id));
+
+    const changedProgrammeIds = state.programmes
+      .filter((record) => {
+        const previous = prev.programmes.find((item) => item.id === record.id);
+        return !previous || previous.updatedAt !== record.updatedAt;
+      })
+      .map((record) => record.id);
+    const changedModuleIds = state.modules
+      .filter((record) => {
+        const previous = prev.modules.find((item) => item.id === record.id);
+        return !previous || previous.name !== record.name || previous.code !== record.code || previous.description !== record.description || previous.credits !== record.credits || previous.year !== record.year || previous.order !== record.order || previous.aims !== record.aims || previous.scheme !== record.scheme || previous.organiser !== record.organiser || previous.url !== record.url || previous.isCompulsory !== record.isCompulsory;
+      })
+      .map((record) => record.id);
+    const changedLoIds = state.learningOutcomes
+      .filter((record) => {
+        const previous = prev.learningOutcomes.find((item) => item.id === record.id);
+        return !previous || previous.text !== record.text || previous.moduleId !== record.moduleId || previous.competencyId !== record.competencyId || previous.category !== record.category || previous.loNumber !== record.loNumber || previous.status !== record.status;
+      })
+      .map((record) => record.id);
+    const changedAssessmentIds = state.assessments
+      .filter((record) => {
+        const previous = prev.assessments.find((item) => item.id === record.id);
+        return !previous || previous.title !== record.title || previous.description !== record.description || previous.moduleId !== record.moduleId || previous.assessmentCode !== record.assessmentCode || previous.weight !== record.weight || previous.duration !== record.duration || previous.priority !== record.priority || previous.rag !== record.rag || previous.status !== record.status;
+      })
+      .map((record) => record.id);
+
+    const deletedProgrammeIds = prev.programmes
+      .filter((item) => !nextProgrammeIds.has(item.id))
+      .map((item) => item.id);
+    const deletedModuleIds = prev.modules
+      .filter((item) => !nextModuleIds.has(item.id))
+      .map((item) => item.id);
+    const deletedLoIds = prev.learningOutcomes
+      .filter((item) => !nextLoIds.has(item.id))
+      .map((item) => item.id);
+    const deletedAssessmentIds = prev.assessments
+      .filter((item) => !nextAssessmentIds.has(item.id))
+      .map((item) => item.id);
+
+    if (changedProgrammeIds.length > 0) {
+      setDirtyProgrammes((current) => Array.from(new Set([...current, ...changedProgrammeIds])));
+    }
+    if (changedModuleIds.length > 0) {
+      setDirtyModules((current) => Array.from(new Set([...current, ...changedModuleIds])));
+    }
+    if (changedLoIds.length > 0) {
+      setDirtyLearningOutcomes((current) => Array.from(new Set([...current, ...changedLoIds])));
+    }
+    if (changedAssessmentIds.length > 0) {
+      setDirtyAssessments((current) => Array.from(new Set([...current, ...changedAssessmentIds])));
+    }
+
+    if (deletedProgrammeIds.length > 0) {
+      setPendingProgrammeDeletes((current) => Array.from(new Set([...current, ...deletedProgrammeIds])));
+      setDirtyProgrammes((current) => current.filter((id) => nextProgrammeIds.has(id)));
+    }
+    if (deletedModuleIds.length > 0) {
+      setPendingModuleDeletes((current) => Array.from(new Set([...current, ...deletedModuleIds])));
+      setDirtyModules((current) => current.filter((id) => nextModuleIds.has(id)));
+    }
+    if (deletedLoIds.length > 0) {
+      setPendingLearningOutcomeDeletes((current) => Array.from(new Set([...current, ...deletedLoIds])));
+      setDirtyLearningOutcomes((current) => current.filter((id) => nextLoIds.has(id)));
+    }
+    if (deletedAssessmentIds.length > 0) {
+      setPendingAssessmentDeletes((current) => Array.from(new Set([...current, ...deletedAssessmentIds])));
+      setDirtyAssessments((current) => current.filter((id) => nextAssessmentIds.has(id)));
+    }
+
+    prevStateRef.current = state;
+
     const ts = new Date().toISOString();
+    const dirtyProgrammeSet = new Set(dirtyProgrammes);
+    const dirtyModuleSet = new Set(dirtyModules);
+    const dirtyLoSet = new Set(dirtyLearningOutcomes);
+    const dirtyAssessmentSet = new Set(dirtyAssessments);
+
     saveAllToIdb({
       programmes: state.programmes.map((p) => ({
         ...p,
-        syncStatus: "pending" as const,
-        localUpdatedAt: ts,
+        syncStatus: (dirtyProgrammeSet.has(p.id) ? "pending" : "synced") as const,
+        localUpdatedAt: dirtyProgrammeSet.has(p.id) ? ts : p.updatedAt,
       })) as IdbProgramme[],
       modules: state.modules.map((m) => ({
         ...m,
-        syncStatus: "pending" as const,
-        localUpdatedAt: ts,
+        syncStatus: (dirtyModuleSet.has(m.id) ? "pending" : "synced") as const,
+        localUpdatedAt: dirtyModuleSet.has(m.id) ? ts : m.updatedAt,
       })) as IdbModule[],
       learningOutcomes: state.learningOutcomes.map((lo) => ({
         ...lo,
-        syncStatus: "pending" as const,
-        localUpdatedAt: ts,
+        syncStatus: (dirtyLoSet.has(lo.id) ? "pending" : "synced") as const,
+        localUpdatedAt: dirtyLoSet.has(lo.id) ? ts : lo.updatedAt,
       })) as IdbLearningOutcome[],
-      assessments: state.assessments.map((a) => ({
-        ...a,
-        syncStatus: "pending" as const,
-        localUpdatedAt: ts,
-      })) as IdbAssessment[],
+      assessments: state.assessments.map((a) => {
+        const assessment = a as unknown as IdbAssessment;
+        const rag: "Red" | "Amber" | "Green" | null =
+          assessment.rag === "Red" || assessment.rag === "Amber" || assessment.rag === "Green"
+            ? assessment.rag
+            : null;
+        return {
+          ...assessment,
+          rag,
+          syncStatus: (dirtyAssessmentSet.has(a.id) ? "pending" : "synced") as const,
+          localUpdatedAt: dirtyAssessmentSet.has(a.id) ? ts : assessment.updatedAt,
+        } as IdbAssessment;
+      }) as IdbAssessment[],
     }).catch(() => {});
-  }, [state]);
+  }, [
+    dirtyAssessments,
+    dirtyLearningOutcomes,
+    dirtyModules,
+    dirtyProgrammes,
+    isPublicSharedView,
+    state,
+  ]);
 
   // ── Online / offline detection ────────────────────────────────────────────
   useEffect(() => {
@@ -379,13 +798,97 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
   // ── Supabase background sync ──────────────────────────────────────────────
   const doSync = useCallback(async () => {
     const supabase = getSupabaseClient();
-    if (!supabase || isOffline) return;
+    if (!supabase || isOffline || isPublicSharedView) return;
+
+    // Migrate local-only/non-UUID owner programmes (e.g. sample-programme)
+    // to UUIDs so they can be persisted to Supabase UUID columns.
+    const needsIdMigration = state.programmes.some(
+      (programme) =>
+        programme.role !== "viewer" &&
+        programme.id !== demoProgrammeId &&
+        !isUuidLike(programme.id),
+    );
+
+    if (needsIdMigration) {
+      setState((current) => {
+        const idMap = new Map<string, string>();
+        current.programmes.forEach((programme) => {
+          if (
+            programme.role !== "viewer" &&
+            programme.id !== demoProgrammeId &&
+            !isUuidLike(programme.id)
+          ) {
+            idMap.set(programme.id, generateId());
+          }
+        });
+
+        if (idMap.size === 0) {
+          return current;
+        }
+
+        console.info("Migrating local programme IDs for Supabase sync", Array.from(idMap.entries()));
+
+        return {
+          programmes: current.programmes.map((programme) => {
+            const nextId = idMap.get(programme.id);
+            if (!nextId) {
+              return programme;
+            }
+            return {
+              ...programme,
+              id: nextId,
+              updatedAt: new Date().toISOString(),
+            };
+          }),
+          modules: current.modules.map((moduleRecord) => ({
+            ...moduleRecord,
+            programmeId: idMap.get(moduleRecord.programmeId) ?? moduleRecord.programmeId,
+          })),
+          learningOutcomes: current.learningOutcomes.map((learningOutcome) => ({
+            ...learningOutcome,
+            programmeId: idMap.get(learningOutcome.programmeId) ?? learningOutcome.programmeId,
+          })),
+          assessments: current.assessments.map((assessment) => ({
+            ...assessment,
+            programmeId: idMap.get(assessment.programmeId) ?? assessment.programmeId,
+          })),
+        };
+      });
+      return;
+    }
 
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) return;
 
-      setSyncState("syncing");
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      if (userError || !user) {
+        console.error("Supabase sync skipped: unable to resolve authenticated user", userError?.message ?? "No user");
+        return;
+      }
+
+      const userEmail = user.email?.trim().toLowerCase() ?? "";
+      if (userEmail) {
+        // Automatically claim any pending invite rows for this signed-in email.
+        const { error: claimInviteError } = await supabase
+          .from("programme_access")
+          .update({
+            grantee_id: user.id,
+            accepted_at: new Date().toISOString(),
+          })
+          .is("grantee_id", null)
+          .ilike("grantee_email", userEmail);
+
+        if (claimInviteError) {
+          console.error("Failed to auto-accept pending shared access invites", {
+            code: claimInviteError.code,
+            message: claimInviteError.message,
+            details: claimInviteError.details,
+            hint: claimInviteError.hint,
+            email: userEmail,
+          });
+        }
+      }
 
       // Push pending writes
       const pending = await getPendingRecords();
@@ -394,23 +897,195 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
         pending.modules.length +
         pending.learningOutcomes.length +
         pending.assessments.length;
+      const totalDeletePending =
+        pendingProgrammeDeletes.length +
+        pendingModuleDeletes.length +
+        pendingLearningOutcomeDeletes.length +
+        pendingAssessmentDeletes.length;
+      setPendingCount(totalPending + totalDeletePending);
 
-      setPendingCount(totalPending);
+      const now = Date.now();
+      const shouldPull = totalPending > 0 || totalDeletePending > 0 || now - lastPullAtRef.current >= 30000;
+      if (totalPending === 0 && totalDeletePending === 0 && !shouldPull) {
+        return;
+      }
+
+      setSyncState("syncing");
+
+      const editableProgrammeIds = new Set(
+        state.programmes
+          .filter((programme) => programme.role !== "viewer" && programme.id !== demoProgrammeId)
+          .map((programme) => programme.id),
+      );
+      const pendingProgrammeIds = new Set(
+        pending.programmes
+          .filter((programme) => isUuidLike(programme.id))
+          .map((programme) => programme.id),
+      );
+      const syncedProgrammeIds = new Set<string>();
+      const syncedModuleIds: string[] = [];
+      const syncedLoIds: string[] = [];
+      const syncedAssessmentIds: string[] = [];
+      const syncedProgrammeIdsForClear: string[] = [];
+
+      // Push programme deletions first so remote rows don't reappear on pull.
+      if (pendingProgrammeDeletes.length > 0) {
+        const remainingDeletes: string[] = [];
+        for (const programmeId of pendingProgrammeDeletes) {
+          if (!isUuidLike(programmeId)) {
+            continue;
+          }
+
+          const { error } = await supabase
+            .from("programmes")
+            .delete()
+            .eq("id", programmeId)
+            .eq("owner_id", user.id);
+
+          if (error && error.code !== "PGRST116") {
+            remainingDeletes.push(programmeId);
+            console.error("Failed deleting programme in Supabase", {
+              programmeId,
+              code: error.code,
+              message: error.message,
+              details: error.details,
+              hint: error.hint,
+            });
+          }
+        }
+        setPendingProgrammeDeletes(remainingDeletes);
+      }
+
+      if (pendingModuleDeletes.length > 0) {
+        const remainingDeletes: string[] = [];
+        for (const moduleId of pendingModuleDeletes) {
+          if (!isUuidLike(moduleId)) continue;
+          const { error } = await supabase.from("modules").delete().eq("id", moduleId);
+          if (error && error.code !== "PGRST116") {
+            remainingDeletes.push(moduleId);
+            console.error("Failed deleting module in Supabase", { moduleId, code: error.code, message: error.message });
+          }
+        }
+        setPendingModuleDeletes(remainingDeletes);
+      }
+
+      if (pendingLearningOutcomeDeletes.length > 0) {
+        const remainingDeletes: string[] = [];
+        for (const learningOutcomeId of pendingLearningOutcomeDeletes) {
+          if (!isUuidLike(learningOutcomeId)) continue;
+          const { error } = await supabase.from("learning_outcomes").delete().eq("id", learningOutcomeId);
+          if (error && error.code !== "PGRST116") {
+            remainingDeletes.push(learningOutcomeId);
+            console.error("Failed deleting learning outcome in Supabase", { learningOutcomeId, code: error.code, message: error.message });
+          }
+        }
+        setPendingLearningOutcomeDeletes(remainingDeletes);
+      }
+
+      if (pendingAssessmentDeletes.length > 0) {
+        const remainingDeletes: string[] = [];
+        for (const assessmentId of pendingAssessmentDeletes) {
+          if (!isUuidLike(assessmentId)) continue;
+          const { error } = await supabase.from("assessments").delete().eq("id", assessmentId);
+          if (error && error.code !== "PGRST116") {
+            remainingDeletes.push(assessmentId);
+            console.error("Failed deleting assessment in Supabase", { assessmentId, code: error.code, message: error.message });
+          }
+        }
+        setPendingAssessmentDeletes(remainingDeletes);
+      }
 
       // Push programmes
       for (const programme of pending.programmes) {
-        const { error } = await supabase.from("programmes").upsert({
+        if (programme.role === "viewer" || programme.id === demoProgrammeId || !isUuidLike(programme.id)) {
+          // Local demo/readonly records are not valid cloud sync targets.
+          await markSynced("programmes", programme.id);
+          continue;
+        }
+
+        const payload = {
           id: programme.id,
+          owner_id: user.id,
           name: programme.name,
           description: programme.description,
           years: programme.years,
+          public_access_enabled: programme.publicAccessEnabled ?? false,
+          public_access_token: programme.publicAccessToken ?? null,
           updated_at: programme.updatedAt,
+        };
+
+        // Update-first avoids noisy 409 conflict responses for already-synced rows.
+        const { data: updatedRows, error: updateError } = await supabase
+          .from("programmes")
+          .update({
+            name: payload.name,
+            description: payload.description,
+            years: payload.years,
+            public_access_enabled: payload.public_access_enabled,
+            public_access_token: payload.public_access_token,
+            updated_at: payload.updated_at,
+          })
+          .eq("id", programme.id)
+          .eq("owner_id", user.id)
+          .select("id");
+
+        if (!updateError && (updatedRows?.length ?? 0) > 0) {
+          await markSynced("programmes", programme.id);
+          syncedProgrammeIds.add(programme.id);
+          syncedProgrammeIdsForClear.push(programme.id);
+          continue;
+        }
+
+        if (updateError) {
+          console.error("Failed updating programme before insert fallback", {
+            programmeId: programme.id,
+            code: updateError.code,
+            message: updateError.message,
+            details: updateError.details,
+            hint: updateError.hint,
+            ownerId: user.id,
+          });
+          continue;
+        }
+
+        const { error: insertError } = await supabase.from("programmes").insert(payload);
+        if (!insertError) {
+          await markSynced("programmes", programme.id);
+          syncedProgrammeIds.add(programme.id);
+          syncedProgrammeIdsForClear.push(programme.id);
+          continue;
+        }
+
+        if (insertError.code === "23505") {
+          // Row already exists remotely; treat as synced to stop duplicate insert loops.
+          await markSynced("programmes", programme.id);
+          syncedProgrammeIds.add(programme.id);
+          syncedProgrammeIdsForClear.push(programme.id);
+          continue;
+        }
+
+        console.error("Failed inserting programme", {
+          programmeId: programme.id,
+          code: insertError.code,
+          message: insertError.message,
+          details: insertError.details,
+          hint: insertError.hint,
+          ownerId: user.id,
         });
-        if (!error) await markSynced("programmes", programme.id);
       }
 
       // Push modules
       for (const moduleRecord of pending.modules) {
+        if (pendingProgrammeIds.has(moduleRecord.programmeId) && !syncedProgrammeIds.has(moduleRecord.programmeId)) {
+          // Parent programme write failed this cycle; skip child push and retry later.
+          continue;
+        }
+
+        if (!editableProgrammeIds.has(moduleRecord.programmeId) || !isUuidLike(moduleRecord.programmeId)) {
+          await markSynced("modules", moduleRecord.id);
+          continue;
+        }
+
         const { error } = await supabase.from("modules").upsert({
           id: moduleRecord.id,
           programme_id: moduleRecord.programmeId,
@@ -427,11 +1102,26 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
           is_compulsory: moduleRecord.isCompulsory,
           updated_at: moduleRecord.updatedAt,
         });
-        if (!error) await markSynced("modules", moduleRecord.id);
+        if (!error) {
+          await markSynced("modules", moduleRecord.id);
+          syncedModuleIds.push(moduleRecord.id);
+        } else {
+          console.error("Failed syncing module", moduleRecord.id, error.message);
+        }
       }
 
       // Push learning outcomes
       for (const lo of pending.learningOutcomes) {
+        if (pendingProgrammeIds.has(lo.programmeId) && !syncedProgrammeIds.has(lo.programmeId)) {
+          // Parent programme write failed this cycle; skip child push and retry later.
+          continue;
+        }
+
+        if (!editableProgrammeIds.has(lo.programmeId) || !isUuidLike(lo.programmeId)) {
+          await markSynced("learning_outcomes", lo.id);
+          continue;
+        }
+
         const { error } = await supabase.from("learning_outcomes").upsert({
           id: lo.id,
           programme_id: lo.programmeId,
@@ -440,14 +1130,29 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
           module_id: lo.moduleId,
           category: lo.category,
           lo_number: lo.loNumber,
-          status: lo.status,
+          status: lo.status ?? null,
           updated_at: lo.updatedAt,
         });
-        if (!error) await markSynced("learning_outcomes", lo.id);
+        if (!error) {
+          await markSynced("learning_outcomes", lo.id);
+          syncedLoIds.push(lo.id);
+        } else {
+          console.error("Failed syncing learning outcome", lo.id, error.message);
+        }
       }
 
       // Push assessments
       for (const assessment of pending.assessments) {
+        if (pendingProgrammeIds.has(assessment.programmeId) && !syncedProgrammeIds.has(assessment.programmeId)) {
+          // Parent programme write failed this cycle; skip child push and retry later.
+          continue;
+        }
+
+        if (!editableProgrammeIds.has(assessment.programmeId) || !isUuidLike(assessment.programmeId)) {
+          await markSynced("assessments", assessment.id);
+          continue;
+        }
+
         const { error } = await supabase.from("assessments").upsert({
           id: assessment.id,
           programme_id: assessment.programmeId,
@@ -459,42 +1164,254 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
           duration: assessment.duration,
           priority_rating: assessment.priority?.toLowerCase() ?? null,
           rag_status: assessment.rag?.toLowerCase() ?? null,
-          status: assessment.status,
+          status: assessment.status ?? null,
           updated_at: assessment.updatedAt,
         });
-        if (!error) await markSynced("assessments", assessment.id);
-      }
-
-      // Pull latest data from Supabase
-      const { data: programmes } = await supabase
-        .from("programmes")
-        .select("*")
-        .order("updated_at", { ascending: false });
-
-      if (programmes) {
-        const mappedProgrammes: IdbProgramme[] = programmes.map((p: Record<string, unknown>) => ({
-          id: p.id as string,
-          name: p.name as string,
-          description: (p.description as string) ?? "",
-          years: p.years as number,
-          ownerEmail: (p.owner_email as string) ?? "",
-          role: (p.role as "owner" | "editor" | "viewer") ?? "owner",
-          updatedAt: p.updated_at as string,
-          syncStatus: "synced" as const,
-          localUpdatedAt: p.updated_at as string,
-        }));
-
-        const changed = await mergeFromSupabase({ programmes: mappedProgrammes });
-        if (changed) {
-          const fresh = await loadAllFromIdb();
-          setState({
-            programmes: fresh.programmes.map(idbRecordToState),
-            modules: fresh.modules.map(idbRecordToState),
-            learningOutcomes: fresh.learningOutcomes.map(idbRecordToState),
-            assessments: fresh.assessments.map(idbRecordToState),
-          });
+        if (!error) {
+          await markSynced("assessments", assessment.id);
+          syncedAssessmentIds.push(assessment.id);
+        } else {
+          console.error("Failed syncing assessment", assessment.id, error.message);
         }
       }
+
+      if (syncedProgrammeIdsForClear.length > 0) {
+        setDirtyProgrammes((current) => current.filter((id) => !syncedProgrammeIdsForClear.includes(id)));
+      }
+      if (syncedModuleIds.length > 0) {
+        setDirtyModules((current) => current.filter((id) => !syncedModuleIds.includes(id)));
+      }
+      if (syncedLoIds.length > 0) {
+        setDirtyLearningOutcomes((current) => current.filter((id) => !syncedLoIds.includes(id)));
+      }
+      if (syncedAssessmentIds.length > 0) {
+        setDirtyAssessments((current) => current.filter((id) => !syncedAssessmentIds.includes(id)));
+      }
+
+      const [accessByIdRes, accessByEmailRes] = await Promise.all([
+        supabase
+          .from("programme_access")
+          .select("programme_id, role")
+          .eq("grantee_id", user.id),
+        userEmail
+          ? supabase
+              .from("programme_access")
+              .select("programme_id, role")
+              .ilike("grantee_email", userEmail)
+          : Promise.resolve({ data: [] as Array<Record<string, unknown>>, error: null }),
+      ]);
+
+      if (accessByIdRes.error) {
+        console.error("Failed fetching programme_access rows by grantee_id", {
+          code: accessByIdRes.error.code,
+          message: accessByIdRes.error.message,
+          details: accessByIdRes.error.details,
+          hint: accessByIdRes.error.hint,
+        });
+      }
+      if (accessByEmailRes.error) {
+        console.error("Failed fetching programme_access rows by grantee_email", {
+          code: accessByEmailRes.error.code,
+          message: accessByEmailRes.error.message,
+          details: accessByEmailRes.error.details,
+          hint: accessByEmailRes.error.hint,
+          email: userEmail,
+        });
+      }
+
+      const accessRows = [
+        ...(accessByIdRes.data ?? []),
+        ...(accessByEmailRes.data ?? []),
+      ] as Array<Record<string, unknown>>;
+
+      const [programmesRes, modulesRes, learningOutcomesRes, assessmentsRes] =
+        initialPullDoneRef.current
+          ? await Promise.all([
+              supabase
+                .from("programmes")
+                .select("*")
+                .gt("updated_at", pullCursors.programmes ?? "1970-01-01T00:00:00.000Z")
+                .order("updated_at", { ascending: true }),
+              supabase
+                .from("modules")
+                .select("*")
+                .gt("updated_at", pullCursors.modules ?? "1970-01-01T00:00:00.000Z")
+                .order("updated_at", { ascending: true }),
+              supabase
+                .from("learning_outcomes")
+                .select("*")
+                .gt("updated_at", pullCursors.learningOutcomes ?? "1970-01-01T00:00:00.000Z")
+                .order("updated_at", { ascending: true }),
+              supabase
+                .from("assessments")
+                .select("*")
+                .gt("updated_at", pullCursors.assessments ?? "1970-01-01T00:00:00.000Z")
+                .order("updated_at", { ascending: true }),
+            ])
+          : await Promise.all([
+              supabase.from("programmes").select("*").order("updated_at", { ascending: true }),
+              supabase.from("modules").select("*").order("updated_at", { ascending: true }),
+              supabase.from("learning_outcomes").select("*").order("updated_at", { ascending: true }),
+              supabase.from("assessments").select("*").order("updated_at", { ascending: true }),
+            ]);
+
+      const accessByProgramme = new Map<string, "editor" | "viewer">();
+      accessRows.forEach((row) => {
+        const role = row.role as string | undefined;
+        const programmeId = row.programme_id as string | undefined;
+        if (!programmeId || (role !== "editor" && role !== "viewer")) {
+          return;
+        }
+
+        const existing = accessByProgramme.get(programmeId);
+        // Prefer editor when duplicate rows exist via id/email matching.
+        if (existing === "editor" || role === "editor") {
+          accessByProgramme.set(programmeId, "editor");
+        } else {
+          accessByProgramme.set(programmeId, "viewer");
+        }
+      });
+
+      const pulledProgrammeRows = [...(programmesRes.data ?? [])] as Record<string, unknown>[];
+
+      const sharedProgrammeIds = Array.from(accessByProgramme.keys());
+      if (sharedProgrammeIds.length > 0) {
+        const { data: sharedProgrammes, error: sharedProgrammesError } = await supabase
+          .from("programmes")
+          .select("*")
+          .in("id", sharedProgrammeIds);
+
+        if (sharedProgrammesError) {
+          console.error("Failed fetching shared programmes by access IDs", {
+            code: sharedProgrammesError.code,
+            message: sharedProgrammesError.message,
+            details: sharedProgrammesError.details,
+            hint: sharedProgrammesError.hint,
+            programmeIds: sharedProgrammeIds,
+          });
+        } else if (sharedProgrammes?.length) {
+          const byId = new Map<string, Record<string, unknown>>();
+          pulledProgrammeRows.forEach((row) => byId.set(String(row.id), row));
+          (sharedProgrammes as Record<string, unknown>[]).forEach((row) => byId.set(String(row.id), row));
+          pulledProgrammeRows.length = 0;
+          pulledProgrammeRows.push(...byId.values());
+        }
+      }
+
+      const mappedProgrammes: IdbProgramme[] = pulledProgrammeRows.map((p: Record<string, unknown>) => ({
+        id: p.id as string,
+        name: p.name as string,
+        description: (p.description as string) ?? "",
+        years: (p.years as number) ?? 1,
+        ownerId: (p.owner_id as string | undefined) ?? undefined,
+        ownerEmail: (p.owner_email as string) ?? "",
+        role:
+          (p.owner_id as string | undefined) === user.id
+            ? "owner"
+            : (accessByProgramme.get(p.id as string) ?? "viewer"),
+        publicAccessEnabled: Boolean(p.public_access_enabled),
+        publicAccessToken: (p.public_access_token as string | null) ?? null,
+        updatedAt: (p.updated_at as string) ?? new Date().toISOString(),
+        syncStatus: "synced" as const,
+        localUpdatedAt: (p.updated_at as string) ?? new Date().toISOString(),
+      })).filter(
+        (programme) =>
+          !(pendingProgrammeDeletes.includes(programme.id) && programme.ownerId === user.id),
+      );
+
+      const mappedModules: IdbModule[] = (modulesRes.data ?? []).map((m: Record<string, unknown>) => ({
+        id: m.id as string,
+        programmeId: m.programme_id as string,
+        year: m.year as number,
+        name: m.name as string,
+        code: (m.code as string) ?? "",
+        credits: (m.credits as string) ?? "",
+        description: (m.description as string) ?? "",
+        order: (m.order as number) ?? 0,
+        aims: (m.aims as string | undefined) ?? undefined,
+        scheme: (m.scheme as string | undefined) ?? undefined,
+        organiser: (m.organiser as string | undefined) ?? undefined,
+        url: (m.url as string | undefined) ?? undefined,
+        isCompulsory: (m.is_compulsory as boolean | undefined) ?? undefined,
+        updatedAt: (m.updated_at as string) ?? new Date().toISOString(),
+        syncStatus: "synced" as const,
+        localUpdatedAt: (m.updated_at as string) ?? new Date().toISOString(),
+      }));
+
+      const mappedLearningOutcomes: IdbLearningOutcome[] = (learningOutcomesRes.data ?? []).map(
+        (lo: Record<string, unknown>) => ({
+          id: lo.id as string,
+          programmeId: lo.programme_id as string,
+          competencyId: (lo.competency_id as string | null) ?? null,
+          text: lo.text as string,
+          moduleId: (lo.module_id as string | null) ?? null,
+          category: (lo.category as string | undefined) ?? undefined,
+          loNumber: (lo.lo_number as string | undefined) ?? undefined,
+          status: (lo.status as "to_delete" | undefined) ?? undefined,
+          updatedAt: (lo.updated_at as string) ?? new Date().toISOString(),
+          syncStatus: "synced" as const,
+          localUpdatedAt: (lo.updated_at as string) ?? new Date().toISOString(),
+        }),
+      );
+
+      const mappedAssessments: IdbAssessment[] = (assessmentsRes.data ?? []).map(
+        (assessment: Record<string, unknown>) => ({
+          id: assessment.id as string,
+          programmeId: assessment.programme_id as string,
+          moduleId: assessment.module_id as string,
+          assessmentCode: (assessment.assessment_code as string) ?? "",
+          title: assessment.title as string,
+          description: (assessment.description as string) ?? "",
+          weight: (assessment.weight as string) ?? "",
+          duration: (assessment.duration as string) ?? "",
+          priority: fromDbPriority((assessment.priority_rating as string | null) ?? null),
+          rag: fromDbRag((assessment.rag_status as string | null) ?? null),
+          status: (assessment.status as "to_delete" | undefined) ?? undefined,
+          learningOutcomeIds: [],
+          updatedAt: (assessment.updated_at as string) ?? new Date().toISOString(),
+          syncStatus: "synced" as const,
+          localUpdatedAt: (assessment.updated_at as string) ?? new Date().toISOString(),
+        }),
+      );
+
+      const changed = await mergeFromSupabase({
+        programmes: mappedProgrammes,
+        modules: mappedModules,
+        learningOutcomes: mappedLearningOutcomes,
+        assessments: mappedAssessments,
+      });
+      if (changed) {
+        const fresh = await loadAllFromIdb();
+        suppressChangeTrackingRef.current = true;
+        setState({
+          programmes: fresh.programmes.map(idbRecordToState),
+          modules: fresh.modules.map(idbRecordToState),
+          learningOutcomes: fresh.learningOutcomes.map(idbRecordToState),
+          assessments: fresh.assessments.map(idbRecordToState),
+        });
+      }
+
+      setPullCursors((current) => ({
+        programmes:
+          mappedProgrammes.length > 0
+            ? mappedProgrammes[mappedProgrammes.length - 1].updatedAt
+            : current.programmes,
+        modules:
+          mappedModules.length > 0
+            ? mappedModules[mappedModules.length - 1].updatedAt
+            : current.modules,
+        learningOutcomes:
+          mappedLearningOutcomes.length > 0
+            ? mappedLearningOutcomes[mappedLearningOutcomes.length - 1].updatedAt
+            : current.learningOutcomes,
+        assessments:
+          mappedAssessments.length > 0
+            ? mappedAssessments[mappedAssessments.length - 1].updatedAt
+            : current.assessments,
+      }));
+      initialPullDoneRef.current = true;
+
+      lastPullAtRef.current = now;
 
       // Recount pending
       const stillPending = await getPendingRecords();
@@ -503,22 +1420,111 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
         stillPending.modules.length +
         stillPending.learningOutcomes.length +
         stillPending.assessments.length;
-      setPendingCount(remaining);
+      setPendingCount(
+        remaining +
+          pendingProgrammeDeletes.length +
+          pendingModuleDeletes.length +
+          pendingLearningOutcomeDeletes.length +
+          pendingAssessmentDeletes.length,
+      );
       setSyncState("idle");
-    } catch {
+    } catch (error) {
+      console.error("Supabase sync failed", error);
       setSyncState(isOffline ? "offline" : "idle");
     }
-  }, [isOffline]);
+  }, [
+    isOffline,
+    isPublicSharedView,
+    pendingAssessmentDeletes,
+    pendingLearningOutcomeDeletes,
+    pendingModuleDeletes,
+    pendingProgrammeDeletes,
+    pullCursors.assessments,
+    pullCursors.learningOutcomes,
+    pullCursors.modules,
+    pullCursors.programmes,
+    state.programmes,
+  ]);
 
   useEffect(() => {
-    doSync();
-    syncIntervalRef.current = setInterval(doSync, 5000);
+    const initTimeout = setTimeout(() => {
+      void doSync();
+    }, 0);
+    syncIntervalRef.current = setInterval(doSync, 15000);
     return () => {
+      clearTimeout(initTimeout);
       if (syncIntervalRef.current) {
         clearInterval(syncIntervalRef.current);
       }
     };
   }, [doSync]);
+
+  const canEditProgrammeInState = useCallback(
+    (current: AppDataState, programmeId: string) => {
+      if (isPublicSharedView && sharedProgrammeId === programmeId) {
+        return false;
+      }
+
+      const programme = current.programmes.find((record) => record.id === programmeId);
+      return Boolean(programme && programme.role !== "viewer");
+    },
+    [isPublicSharedView, sharedProgrammeId],
+  );
+
+  const setProgrammePublicAccess = useCallback((programmeId: string, enabled: boolean) => {
+    setState((current) => {
+      if (!canEditProgrammeInState(current, programmeId)) {
+        return current;
+      }
+
+      if (programmeId === demoProgrammeId || !isUuidLike(programmeId)) {
+        return current;
+      }
+
+      return {
+        ...current,
+        programmes: current.programmes.map((programme) => {
+          if (programme.id !== programmeId) {
+            return programme;
+          }
+
+          const token = enabled
+            ? programme.publicAccessToken ?? generateId()
+            : null;
+
+          return {
+            ...programme,
+            publicAccessEnabled: enabled,
+            publicAccessToken: token,
+            updatedAt: new Date().toISOString(),
+          };
+        }),
+      };
+    });
+  }, [canEditProgrammeInState]);
+
+  const getProgrammeShareUrl = useCallback(
+    (programmeId: string) => {
+      const programme = state.programmes.find((record) => record.id === programmeId);
+      if (
+        !programme ||
+        programme.id === demoProgrammeId ||
+        !isUuidLike(programme.id) ||
+        !programme.publicAccessEnabled ||
+        !programme.publicAccessToken
+      ) {
+        return null;
+      }
+
+      if (typeof window === "undefined") {
+        return null;
+      }
+
+      const url = new URL(window.location.origin + "/share/" + encodeURIComponent(programme.publicAccessToken));
+      return url.toString();
+    },
+    [state.programmes],
+  );
 
   const createProgramme = useCallback(
     (input: { name: string; description: string; years: number }) => {
@@ -530,6 +1536,8 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
         years: input.years,
         ownerEmail: "owner@example.edu",
         role: "owner",
+        publicAccessEnabled: false,
+        publicAccessToken: null,
         updatedAt: new Date().toISOString(),
       };
 
@@ -543,27 +1551,35 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
     (programmeId: string, patch: Partial<Pick<Programme, "name" | "description" | "years">>) => {
       setState((current) => ({
         ...current,
-        programmes: current.programmes.map((programme) =>
-          programme.id === programmeId
-            ? { ...programme, ...patch, updatedAt: new Date().toISOString() }
-            : programme,
-        ),
+        programmes: canEditProgrammeInState(current, programmeId)
+          ? current.programmes.map((programme) =>
+              programme.id === programmeId
+                ? { ...programme, ...patch, updatedAt: new Date().toISOString() }
+                : programme,
+            )
+          : current.programmes,
       }));
     },
-    [],
+    [canEditProgrammeInState],
   );
 
   const renameProgramme = useCallback((programmeId: string, name: string) => {
     setState((current) => ({
       ...current,
-      programmes: current.programmes.map((programme) =>
-        programme.id === programmeId ? { ...programme, name, updatedAt: new Date().toISOString() } : programme,
-      ),
+      programmes: canEditProgrammeInState(current, programmeId)
+        ? current.programmes.map((programme) =>
+            programme.id === programmeId ? { ...programme, name, updatedAt: new Date().toISOString() } : programme,
+          )
+        : current.programmes,
     }));
-  }, []);
+  }, [canEditProgrammeInState]);
 
   const updateProgrammeYears = useCallback((programmeId: string, years: number) => {
     setState((current) => {
+      if (!canEditProgrammeInState(current, programmeId)) {
+        return current;
+      }
+
       const programmes = current.programmes.map((programme) =>
         programme.id === programmeId ? { ...programme, years, updatedAt: new Date().toISOString() } : programme,
       );
@@ -584,18 +1600,28 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
 
       return { programmes, modules, learningOutcomes, assessments };
     });
-  }, []);
+  }, [canEditProgrammeInState]);
 
   const deleteProgramme = useCallback((programmeId: string) => {
-    setState((current) => ({
-      programmes: current.programmes.filter((programme) => programme.id !== programmeId),
-      modules: current.modules.filter((module) => module.programmeId !== programmeId),
-      learningOutcomes: current.learningOutcomes.filter(
-        (learningOutcome) => learningOutcome.programmeId !== programmeId,
-      ),
-      assessments: current.assessments.filter((assessment) => assessment.programmeId !== programmeId),
-    }));
-  }, []);
+    setState((current) => {
+      if (!canEditProgrammeInState(current, programmeId)) {
+        return current;
+      }
+
+      return {
+        programmes: current.programmes.filter((programme) => programme.id !== programmeId),
+        modules: current.modules.filter((module) => module.programmeId !== programmeId),
+        learningOutcomes: current.learningOutcomes.filter(
+          (learningOutcome) => learningOutcome.programmeId !== programmeId,
+        ),
+        assessments: current.assessments.filter((assessment) => assessment.programmeId !== programmeId),
+      };
+    });
+
+    setPendingProgrammeDeletes((current) =>
+      current.includes(programmeId) ? current : [...current, programmeId],
+    );
+  }, [canEditProgrammeInState]);
 
   const getModuleDeletionImpact = useCallback(
     (moduleId: string) => getModuleDeletionImpactFromState(state, moduleId),
@@ -610,6 +1636,10 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
     };
 
     setState((current) => {
+      if (!canEditProgrammeInState(current, programmeId)) {
+        return current;
+      }
+
       const moduleIds = current.modules
         .filter((module) => module.programmeId === programmeId && module.year === year)
         .map((module) => module.id);
@@ -619,7 +1649,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
     });
 
     return result;
-  }, []);
+  }, [canEditProgrammeInState]);
 
   const resetProgrammeModules = useCallback((programmeId: string) => {
     let result: BulkModuleDeletionResult = {
@@ -629,6 +1659,10 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
     };
 
     setState((current) => {
+      if (!canEditProgrammeInState(current, programmeId)) {
+        return current;
+      }
+
       const moduleIds = current.modules
         .filter((module) => module.programmeId === programmeId)
         .map((module) => module.id);
@@ -638,12 +1672,16 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
     });
 
     return result;
-  }, []);
+  }, [canEditProgrammeInState]);
 
   const addModule = useCallback(
     (programmeId: string, input: { year: number; name: string; code?: string }) => {
       const moduleId = generateId();
       setState((current) => {
+        if (!canEditProgrammeInState(current, programmeId)) {
+          return current;
+        }
+
         const siblings = current.modules.filter(
           (module) => module.programmeId === programmeId && module.year === input.year,
         );
@@ -668,14 +1706,14 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
       });
       return moduleId;
     },
-    [],
+    [canEditProgrammeInState],
   );
 
   const updateModule = useCallback(
     (moduleId: string, patch: Partial<Pick<Module, "name" | "code" | "credits" | "description" | "year" | "aims" | "scheme" | "organiser" | "url" | "isCompulsory">>) => {
       setState((current) => {
         const target = current.modules.find((module) => module.id === moduleId);
-        if (!target) {
+        if (!target || !canEditProgrammeInState(current, target.programmeId)) {
           return current;
         }
 
@@ -688,7 +1726,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
         };
       });
     },
-    [],
+    [canEditProgrammeInState],
   );
 
   const deleteModule = useCallback((moduleId: string) => {
@@ -696,7 +1734,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
 
     setState((current) => {
       impact = getModuleDeletionImpactFromState(current, moduleId);
-      if (!impact?.canDelete) {
+      if (!impact?.canDelete || !canEditProgrammeInState(current, impact.programmeId)) {
         return current;
       }
 
@@ -704,7 +1742,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
     });
 
     return impact;
-  }, []);
+  }, [canEditProgrammeInState]);
 
   const addLearningOutcome = useCallback(
     (
@@ -712,26 +1750,32 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
       input: { competencyId: string | null; text: string; category?: string; loNumber?: string },
     ) => {
       const learningOutcomeId = generateId();
-      setState((current) => ({
-        ...current,
-        programmes: touchProgramme(current.programmes, programmeId),
-        learningOutcomes: [
-          ...current.learningOutcomes,
-          {
-            id: learningOutcomeId,
-            programmeId,
-            competencyId: input.competencyId,
-            text: input.text,
-            moduleId: null,
-            category: input.category,
-            loNumber: input.loNumber,
-          },
-        ],
-      }));
+      setState((current) => {
+        if (!canEditProgrammeInState(current, programmeId)) {
+          return current;
+        }
+
+        return {
+          ...current,
+          programmes: touchProgramme(current.programmes, programmeId),
+          learningOutcomes: [
+            ...current.learningOutcomes,
+            {
+              id: learningOutcomeId,
+              programmeId,
+              competencyId: input.competencyId,
+              text: input.text,
+              moduleId: null,
+              category: input.category,
+              loNumber: input.loNumber,
+            },
+          ],
+        };
+      });
 
       return learningOutcomeId;
     },
-    [],
+    [canEditProgrammeInState],
   );
 
   const updateLearningOutcome = useCallback(
@@ -741,7 +1785,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
     ) => {
       setState((current) => {
         const target = current.learningOutcomes.find((learningOutcome) => learningOutcome.id === learningOutcomeId);
-        if (!target) {
+        if (!target || !canEditProgrammeInState(current, target.programmeId)) {
           return current;
         }
 
@@ -754,13 +1798,13 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
         };
       });
     },
-    [],
+    [canEditProgrammeInState],
   );
 
   const deleteLearningOutcome = useCallback((learningOutcomeId: string) => {
     setState((current) => {
       const target = current.learningOutcomes.find((learningOutcome) => learningOutcome.id === learningOutcomeId);
-      if (!target) {
+      if (!target || !canEditProgrammeInState(current, target.programmeId)) {
         return current;
       }
 
@@ -776,7 +1820,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
         })),
       };
     });
-  }, []);
+  }, [canEditProgrammeInState]);
 
   const addAssessment = useCallback(
     (
@@ -792,31 +1836,37 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
       },
     ) => {
       const assessmentId = generateId();
-      setState((current) => ({
-        ...current,
-        programmes: touchProgramme(current.programmes, programmeId),
-        assessments: [
-          ...current.assessments,
-          {
-            id: assessmentId,
-            programmeId,
-            moduleId: input.moduleId,
-            assessmentCode: input.assessmentCode ?? "",
-            title: input.title,
-            description: "",
-            weight: input.weight ?? "",
-            duration: input.duration ?? "",
-            priority: input.priority ?? null,
-            rag: input.rag,
-            learningOutcomeIds: current.learningOutcomes
-              .filter((learningOutcome) => learningOutcome.moduleId === input.moduleId)
-              .map((learningOutcome) => learningOutcome.id),
-          },
-        ],
-      }));
+      setState((current) => {
+        if (!canEditProgrammeInState(current, programmeId)) {
+          return current;
+        }
+
+        return {
+          ...current,
+          programmes: touchProgramme(current.programmes, programmeId),
+          assessments: [
+            ...current.assessments,
+            {
+              id: assessmentId,
+              programmeId,
+              moduleId: input.moduleId,
+              assessmentCode: input.assessmentCode ?? "",
+              title: input.title,
+              description: "",
+              weight: input.weight ?? "",
+              duration: input.duration ?? "",
+              priority: input.priority ?? null,
+              rag: input.rag,
+              learningOutcomeIds: current.learningOutcomes
+                .filter((learningOutcome) => learningOutcome.moduleId === input.moduleId)
+                .map((learningOutcome) => learningOutcome.id),
+            },
+          ],
+        };
+      });
       return assessmentId;
     },
-    [],
+    [canEditProgrammeInState],
   );
 
   const updateAssessment = useCallback(
@@ -831,7 +1881,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
     ) => {
       setState((current) => {
         const target = current.assessments.find((assessment) => assessment.id === assessmentId);
-        if (!target) {
+        if (!target || !canEditProgrammeInState(current, target.programmeId)) {
           return current;
         }
 
@@ -844,13 +1894,13 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
         };
       });
     },
-    [],
+    [canEditProgrammeInState],
   );
 
   const deleteAssessment = useCallback((assessmentId: string) => {
     setState((current) => {
       const target = current.assessments.find((assessment) => assessment.id === assessmentId);
-      if (!target) {
+      if (!target || !canEditProgrammeInState(current, target.programmeId)) {
         return current;
       }
 
@@ -860,10 +1910,14 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
         assessments: current.assessments.filter((assessment) => assessment.id !== assessmentId),
       };
     });
-  }, []);
+  }, [canEditProgrammeInState]);
 
   const importCsvModules = useCallback((programmeId: string, rows: CsvModuleImportRow[]) => {
     setState((current) => {
+      if (!canEditProgrammeInState(current, programmeId)) {
+        return current;
+      }
+
       const existingModules = current.modules.filter((m) => m.programmeId === programmeId);
       let modules = [...current.modules];
       let learningOutcomes = [...current.learningOutcomes];
@@ -965,28 +2019,34 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
         assessments,
       };
     });
-  }, []);
+  }, [canEditProgrammeInState]);
 
   const importProgrammeLearningOutcomes = useCallback(
     (programmeId: string, rows: CsvProgrammeLearningOutcomeImportRow[]) => {
-      setState((current) => ({
-        ...current,
-        programmes: touchProgramme(current.programmes, programmeId),
-        learningOutcomes: [
-          ...current.learningOutcomes,
-          ...rows.map((row) => ({
-            id: generateId(),
-            programmeId,
-            competencyId: null,
-            text: row.text,
-            moduleId: null,
-            category: row.category,
-            loNumber: row.loNumber,
-          })),
-        ],
-      }));
+      setState((current) => {
+        if (!canEditProgrammeInState(current, programmeId)) {
+          return current;
+        }
+
+        return {
+          ...current,
+          programmes: touchProgramme(current.programmes, programmeId),
+          learningOutcomes: [
+            ...current.learningOutcomes,
+            ...rows.map((row) => ({
+              id: generateId(),
+              programmeId,
+              competencyId: null,
+              text: row.text,
+              moduleId: null,
+              category: row.category,
+              loNumber: row.loNumber,
+            })),
+          ],
+        };
+      });
     },
-    [],
+    [canEditProgrammeInState],
   );
 
   const exportProgrammeBackup = useCallback(
@@ -1009,6 +2069,10 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
   );
 
   const importProgrammeBackup = useCallback((payload: BackupPayload) => {
+    if (isPublicSharedView) {
+      return "";
+    }
+
     const programmeId = generateId();
     const moduleIdMap = new Map<string, string>();
     const learningOutcomeIdMap = new Map<string, string>();
@@ -1019,6 +2083,8 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
         id: programmeId,
         role: "owner",
         ownerEmail: "owner@example.edu",
+        publicAccessEnabled: false,
+        publicAccessToken: null,
         name: `${payload.programme.name} (Imported)`,
         updatedAt: new Date().toISOString(),
       },
@@ -1061,7 +2127,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
     }));
 
     return programmeId;
-  }, []);
+  }, [isPublicSharedView]);
 
   const value = useMemo<AppDataContextValue>(
     () => ({
@@ -1069,8 +2135,13 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
       isOffline,
       syncState,
       pendingCount,
+      isPublicSharedView,
+      sharedProgrammeId,
+      isViewOnly,
       createProgramme,
       updateProgramme,
+      setProgrammePublicAccess,
+      getProgrammeShareUrl,
       renameProgramme,
       updateProgrammeYears,
       deleteProgramme,
@@ -1096,8 +2167,13 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
       isOffline,
       syncState,
       pendingCount,
+      isPublicSharedView,
+      sharedProgrammeId,
+      isViewOnly,
       createProgramme,
       updateProgramme,
+      setProgrammePublicAccess,
+      getProgrammeShareUrl,
       renameProgramme,
       updateProgrammeYears,
       deleteProgramme,

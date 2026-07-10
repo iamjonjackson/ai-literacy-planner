@@ -13,10 +13,11 @@ function ImplementPageContent() {
   const programmeId = searchParams.get("programme") ?? params.id;
   const router = useRouter();
   const importRef = useRef<HTMLInputElement>(null);
-  const { state, exportProgrammeBackup, importProgrammeBackup } = useAppData();
+  const { state, exportProgrammeBackup, importProgrammeBackup, isViewOnly } = useAppData();
 
 
   const programme = state.programmes.find((record) => record.id === programmeId);
+  const viewOnly = isViewOnly(programmeId);
   const modules = state.modules.filter((module) => module.programmeId === programmeId);
   const learningOutcomes = state.learningOutcomes.filter((learningOutcome) => learningOutcome.programmeId === programmeId);
   const assessments = state.assessments.filter((assessment) => assessment.programmeId === programmeId);
@@ -42,6 +43,11 @@ function ImplementPageContent() {
   };
 
   const importBackup = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    if (viewOnly) {
+      event.target.value = "";
+      return;
+    }
+
     const file = event.target.files?.[0];
     if (!file) {
       return;
@@ -166,14 +172,20 @@ function ImplementPageContent() {
               <p className="mt-2 text-sm text-slate-600">
                 Import creates a new owned programme with regenerated record IDs.
               </p>
-              <button
-                type="button"
-                className="mt-4 rounded-xl border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:border-slate-400"
-                onClick={() => importRef.current?.click()}
-              >
-                Import JSON
-              </button>
-              <input ref={importRef} type="file" accept="application/json" className="hidden" onChange={importBackup} />
+              {!viewOnly ? (
+                <>
+                  <button
+                    type="button"
+                    className="mt-4 rounded-xl border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:border-slate-400"
+                    onClick={() => importRef.current?.click()}
+                  >
+                    Import JSON
+                  </button>
+                  <input ref={importRef} type="file" accept="application/json" className="hidden" onChange={importBackup} />
+                </>
+              ) : (
+                <p className="mt-4 text-xs text-amber-700">View-only access: JSON restore is disabled.</p>
+              )}
             </article>
           </div>
         </div>

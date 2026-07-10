@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Modal } from "@/components/modal";
 import { getSupabaseClient } from "@/lib/supabase";
 
@@ -15,14 +15,67 @@ type ShareModalProps = {
   onClose: () => void;
   programmeId: string;
   programmeName: string;
+  canManagePublic: boolean;
+  isPublicEnabled: boolean;
+  shareUrl: string | null;
+  onTogglePublic: (enabled: boolean) => void;
 };
 
-export function ShareModal({ open, onClose, programmeId, programmeName }: ShareModalProps) {
+export function ShareModal({
+  open,
+  onClose,
+  programmeId,
+  programmeName,
+  canManagePublic,
+  isPublicEnabled,
+  shareUrl,
+  onTogglePublic,
+}: ShareModalProps) {
   const [email, setEmail] = useState("");
   const [role, setRole] = useState<"viewer" | "editor">("viewer");
   const [collaborators, setCollaborators] = useState<Collaborator[]>([]);
   const [status, setStatus] = useState<"idle" | "sending" | "success" | "error">("idle");
   const [errorMessage, setErrorMessage] = useState("");
+
+  const loadCollaborators = useCallback(async () => {
+    const supabase = getSupabaseClient();
+    if (!supabase) {
+      return;
+    }
+
+    const { data, error } = await supabase
+      .from("programme_access")
+      .select("grantee_email, role, grantee_id, accepted_at")
+      .eq("programme_id", programmeId)
+      .order("grantee_email", { ascending: true });
+
+    if (error) {
+      setErrorMessage(error.message);
+      return;
+    }
+
+    setCollaborators(
+      (data ?? []).map((row: Record<string, unknown>) => ({
+        email: String(row.grantee_email ?? ""),
+        role: (row.role as "viewer" | "editor") ?? "viewer",
+        status: row.grantee_id || row.accepted_at ? "active" : "pending",
+      })),
+    );
+  }, [programmeId]);
+
+  useEffect(() => {
+    if (!open) {
+      return;
+    }
+
+    const timer = window.setTimeout(() => {
+      void loadCollaborators();
+    }, 0);
+
+    return () => {
+      window.clearTimeout(timer);
+    };
+  }, [loadCollaborators, open]);
 
   const handleInvite = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -46,10 +99,22 @@ export function ShareModal({ open, onClose, programmeId, programmeName }: ShareM
     }
 
     try {
+      const {
+        data: { user },
+        error: userError,
+      } = await supabase.auth.getUser();
+
+      if (userError || !user) {
+        setStatus("error");
+        setErrorMessage(userError?.message ?? "You must be signed in to share this programme.");
+        return;
+      }
+
       const { error } = await supabase.from("programme_access").upsert(
         {
           programme_id: programmeId,
-          grantee_email: email.trim(),
+          granted_by: user.id,
+          grantee_email: email.trim().toLowerCase(),
           role,
         },
         { onConflict: "programme_id,grantee_email" },
@@ -61,10 +126,7 @@ export function ShareModal({ open, onClose, programmeId, programmeName }: ShareM
         return;
       }
 
-      setCollaborators((prev) => [
-        ...prev.filter((c) => c.email !== email.trim()),
-        { email: email.trim(), role, status: "pending" },
-      ]);
+      await loadCollaborators();
       setEmail("");
       setStatus("success");
       setTimeout(() => setStatus("idle"), 2000);
@@ -83,6 +145,8 @@ export function ShareModal({ open, onClose, programmeId, programmeName }: ShareM
         .delete()
         .eq("programme_id", programmeId)
         .eq("grantee_email", granteeEmail);
+      await loadCollaborators();
+      return;
     }
 
     setCollaborators((prev) => prev.filter((c) => c.email !== granteeEmail));
@@ -90,6 +154,48 @@ export function ShareModal({ open, onClose, programmeId, programmeName }: ShareM
 
   return (
     <Modal open={open} onClose={onClose} title={`Share — ${programmeName}`} className="max-w-lg">
+      <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <p className="text-sm font-semibold text-slate-900">Public readonly link</p>
+            <p className="text-xs text-slate-600">
+              Anyone with the link can view this programme and export data, but cannot edit.
+            </p>
+          </div>
+          <button
+            type="button"
+            disabled={!canManagePublic}
+            className={`rounded-full px-3 py-1 text-xs font-semibold ${
+              isPublicEnabled ? "bg-emerald-100 text-emerald-700" : "bg-slate-200 text-slate-700"
+            } disabled:opacity-60`}
+            onClick={() => onTogglePublic(!isPublicEnabled)}
+          >
+            {isPublicEnabled ? "Public ON" : "Public OFF"}
+          </button>
+        </div>
+        {isPublicEnabled ? (
+          <div className="mt-3 flex gap-2">
+            <input
+              type="text"
+              readOnly
+              value={shareUrl ?? ""}
+              className="flex-1 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs text-slate-700"
+            />
+            <button
+              type="button"
+              className="rounded-xl bg-blue-600 px-3 py-2 text-xs font-semibold text-white hover:bg-blue-700"
+              onClick={() => {
+                if (shareUrl) {
+                  navigator.clipboard.writeText(shareUrl).catch(() => {});
+                }
+              }}
+            >
+              Copy
+            </button>
+          </div>
+        ) : null}
+      </div>
+
       <p className="text-sm text-slate-600">
         Invite collaborators by email. They will receive a magic link to access this programme.
       </p>

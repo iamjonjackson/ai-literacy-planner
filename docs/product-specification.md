@@ -226,10 +226,13 @@ create table public.programmes (
   name        text not null,
   description text,
   years       int not null default 3 check (years >= 1),
+  public_access_enabled boolean not null default false,
+  public_access_token text,
   created_at  timestamptz not null default now(),
   updated_at  timestamptz not null default now()
 );
 alter table public.programmes enable row level security;
+create index on public.programmes (public_access_enabled, public_access_token);
 
 -- ─── PROGRAMME ACCESS ────────────────────────────────────────────────────────
 -- Tracks which users have been granted access to a programme (beyond the owner).
@@ -248,12 +251,34 @@ create table public.programme_access (
 );
 alter table public.programme_access enable row level security;
 
+-- ─── RLS HELPER: is_programme_owner (non-recursive) ───────────────────────
+-- SECURITY DEFINER avoids policy recursion when policy checks traverse
+-- programme/programme_access relationships.
+create or replace function public.is_programme_owner(prog_id uuid)
+returns boolean language sql security definer as $$
+  select exists (
+    select 1 from public.programmes p
+    where p.id = prog_id and p.owner_id = auth.uid()
+  );
+$$;
+
 -- Programme RLS policies:
--- Owners can do anything to their programmes
-create policy "Owners have full access to their programmes"
-  on public.programmes for all
-  using (auth.uid() = owner_id)
-  with check (auth.uid() = owner_id);
+create policy "Owners can read their programmes"
+  on public.programmes for select
+  using (public.is_programme_owner(id));
+
+create policy "Owners can insert their programmes"
+  on public.programmes for insert
+  with check (owner_id = auth.uid());
+
+create policy "Owners can update their programmes"
+  on public.programmes for update
+  using (public.is_programme_owner(id))
+  with check (public.is_programme_owner(id));
+
+create policy "Owners can delete their programmes"
+  on public.programmes for delete
+  using (public.is_programme_owner(id));
 
 -- Viewers and editors can read programmes they have access to
 create policy "Shared users can read programmes"
@@ -262,9 +287,18 @@ create policy "Shared users can read programmes"
     exists (
       select 1 from public.programme_access pa
       where pa.programme_id = id
-        and pa.grantee_id = auth.uid()
+        and (
+          pa.grantee_id = auth.uid()
+          or lower(pa.grantee_email) = lower(coalesce(auth.jwt() ->> 'email', ''))
+        )
     )
   );
+
+-- Optional public readonly sharing (anon role) via tokenized link
+create policy "Anon can read publicly shared programmes"
+  on public.programmes for select
+  to anon
+  using (public_access_enabled = true and public_access_token is not null);
 
 -- Editors can update programmes (but not delete or change owner)
 create policy "Editors can update programmes"
@@ -273,7 +307,10 @@ create policy "Editors can update programmes"
     exists (
       select 1 from public.programme_access pa
       where pa.programme_id = id
-        and pa.grantee_id = auth.uid()
+        and (
+          pa.grantee_id = auth.uid()
+          or lower(pa.grantee_email) = lower(coalesce(auth.jwt() ->> 'email', ''))
+        )
         and pa.role = 'editor'
     )
   );
@@ -281,16 +318,23 @@ create policy "Editors can update programmes"
 -- Programme access RLS:
 create policy "Owners can manage access for their programmes"
   on public.programme_access for all
-  using (
-    exists (
-      select 1 from public.programmes p
-      where p.id = programme_id and p.owner_id = auth.uid()
-    )
-  );
+  using (public.is_programme_owner(programme_id))
+  with check (public.is_programme_owner(programme_id));
 
 create policy "Users can view their own access grants"
   on public.programme_access for select
   using (grantee_id = auth.uid());
+
+create policy "Invitees can accept pending access grants"
+  on public.programme_access for update
+  using (
+    grantee_id is null
+    and lower(grantee_email) = lower(coalesce(auth.jwt() ->> 'email', ''))
+  )
+  with check (
+    grantee_id = auth.uid()
+    and lower(grantee_email) = lower(coalesce(auth.jwt() ->> 'email', ''))
+  );
 
 -- ─── MODULES ─────────────────────────────────────────────────────────────────
 create table public.modules (
@@ -386,10 +430,7 @@ alter table public.assessment_los enable row level security;
 -- Reusable function to check read access (owner OR granted user)
 create or replace function public.can_access_programme(prog_id uuid)
 returns boolean language sql security definer as $$
-  select exists (
-    select 1 from public.programmes p
-    where p.id = prog_id and p.owner_id = auth.uid()
-  )
+  select public.is_programme_owner(prog_id)
   or exists (
     select 1 from public.programme_access pa
     where pa.programme_id = prog_id and pa.grantee_id = auth.uid()
@@ -399,10 +440,7 @@ $$;
 -- ─── RLS HELPER: can_edit_programme ──────────────────────────────────────────
 create or replace function public.can_edit_programme(prog_id uuid)
 returns boolean language sql security definer as $$
-  select exists (
-    select 1 from public.programmes p
-    where p.id = prog_id and p.owner_id = auth.uid()
-  )
+  select public.is_programme_owner(prog_id)
   or exists (
     select 1 from public.programme_access pa
     where pa.programme_id = prog_id
@@ -411,10 +449,45 @@ returns boolean language sql security definer as $$
   );
 $$;
 
+alter function public.is_programme_owner(uuid) set search_path = public;
+alter function public.can_access_programme(uuid) set search_path = public;
+alter function public.can_edit_programme(uuid) set search_path = public;
+
+-- ─── GRANTS FOR SUPABASE API ROLES ─────────────────────────────────────────
+grant usage on schema public to anon, authenticated;
+
+grant select, insert, update, delete on table public.programmes to authenticated;
+grant select, insert, update, delete on table public.modules to authenticated;
+grant select, insert, update, delete on table public.learning_outcomes to authenticated;
+grant select, insert, update, delete on table public.assessments to authenticated;
+grant select, insert, update, delete on table public.programme_access to authenticated;
+grant select, insert, update, delete on table public.assessment_los to authenticated;
+
+-- Public read for shared-link mode (optional)
+grant select on table public.programmes to anon;
+grant select on table public.modules to anon;
+grant select on table public.learning_outcomes to anon;
+grant select on table public.assessments to anon;
+
+grant execute on function public.is_programme_owner(uuid) to anon, authenticated;
+grant execute on function public.can_access_programme(uuid) to anon, authenticated;
+grant execute on function public.can_edit_programme(uuid) to anon, authenticated;
+
 -- ─── RLS POLICIES: child tables ──────────────────────────────────────────────
 -- Modules
 create policy "Read access for programme members"
   on public.modules for select using (public.can_access_programme(programme_id));
+create policy "Anon can read modules for publicly shared programmes"
+  on public.modules for select
+  to anon
+  using (
+    exists (
+      select 1 from public.programmes p
+      where p.id = modules.programme_id
+        and p.public_access_enabled = true
+        and p.public_access_token is not null
+    )
+  );
 create policy "Write access for programme editors"
   on public.modules for insert with check (public.can_edit_programme(programme_id));
 create policy "Update access for programme editors"
@@ -425,6 +498,17 @@ create policy "Delete access for programme editors"
 -- Learning Outcomes
 create policy "Read access for programme members"
   on public.learning_outcomes for select using (public.can_access_programme(programme_id));
+create policy "Anon can read LOs for publicly shared programmes"
+  on public.learning_outcomes for select
+  to anon
+  using (
+    exists (
+      select 1 from public.programmes p
+      where p.id = learning_outcomes.programme_id
+        and p.public_access_enabled = true
+        and p.public_access_token is not null
+    )
+  );
 create policy "Write access for programme editors"
   on public.learning_outcomes for insert with check (public.can_edit_programme(programme_id));
 create policy "Update access for programme editors"
@@ -435,6 +519,17 @@ create policy "Delete access for programme editors"
 -- Assessments
 create policy "Read access for programme members"
   on public.assessments for select using (public.can_access_programme(programme_id));
+create policy "Anon can read assessments for publicly shared programmes"
+  on public.assessments for select
+  to anon
+  using (
+    exists (
+      select 1 from public.programmes p
+      where p.id = assessments.programme_id
+        and p.public_access_enabled = true
+        and p.public_access_token is not null
+    )
+  );
 create policy "Write access for programme editors"
   on public.assessments for insert with check (public.can_edit_programme(programme_id));
 create policy "Update access for programme editors"
@@ -550,6 +645,7 @@ localUpdatedAt: string             // ISO 8601 — time of last local write
 3. **If the email is already a registered user:** the programme immediately appears in their dashboard on next sync
 4. **If the email is not yet registered:** Supabase sends them a magic link invite email; on first login, the `grantee_id` in `programme_access` is populated and the programme becomes accessible
 5. The Share panel lists all current collaborators (email, role, status: Pending / Active) with options for the owner to **change role** or **revoke access**
+6. Owners can enable **Public readonly access** and copy a friendly share URL in the format `/share/[token]`
 
 ### 7.3 Access Indicators in the UI
 
@@ -567,6 +663,7 @@ localUpdatedAt: string             // ISO 8601 — time of last local write
 /login                   → magic link login page (unauthenticated only)
 /                        → redirect to /dashboard
 /dashboard               → programme list + create new
+/share/[token]           → public readonly entry route for shared programmes
 /programme/[id]/explore  → Tab 1: Explore framework
 /programme/[id]/design   → Tab 2: Design LOs
 /programme/[id]/plan     → Tab 3: Plan structure

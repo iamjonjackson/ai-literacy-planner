@@ -17,14 +17,31 @@ export default function AuthCallbackPage() {
       return;
     }
 
-    // Supabase auth with PKCE flow — handle token_hash from query params
+    // Supabase auth callback supports both PKCE code exchange and token hashes.
     const params = new URLSearchParams(window.location.search);
+    const code = params.get("code");
     const tokenHash = params.get("token_hash");
     const type = params.get("type");
 
+    if (code) {
+      supabase.auth.exchangeCodeForSession(code).then(({ error }) => {
+        if (error) {
+          setStatus("error");
+          setMessage(error.message);
+        } else {
+          setStatus("success");
+          router.replace("/dashboard");
+        }
+      });
+      return;
+    }
+
     if (tokenHash && type) {
       supabase.auth
-        .verifyOtp({ token_hash: tokenHash, type: type as "email" | "recovery" | "invite" })
+        .verifyOtp({
+          token_hash: tokenHash,
+          type: type as "email" | "recovery" | "invite" | "magiclink" | "email_change",
+        })
         .then(({ error }) => {
           if (error) {
             setStatus("error");

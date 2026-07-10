@@ -6,21 +6,41 @@ import { useAuth } from "@/lib/auth";
 
 export function SiteHeader() {
   const { isOffline, syncState, pendingCount } = useAppData();
-  const { user, session, signOut } = useAuth();
+  const { user, session, signOut, configured, loading } = useAuth();
 
+  const hasPendingChanges = pendingCount > 0;
   const syncLabel =
     isOffline || syncState === "offline"
-      ? `Offline${pendingCount > 0 ? ` · ${pendingCount} pending` : ""}`
+      ? `Offline${hasPendingChanges ? ` · ${pendingCount} pending` : ""}`
       : syncState === "syncing"
         ? "Syncing…"
-        : "Synced";
+        : hasPendingChanges
+          ? `Pending sync · ${pendingCount}`
+          : "Synced";
 
   const syncClass =
     isOffline || syncState === "offline"
       ? "bg-amber-100 text-amber-700"
       : syncState === "syncing"
         ? "bg-blue-100 text-blue-700"
-        : "bg-emerald-100 text-emerald-700";
+        : hasPendingChanges
+          ? "bg-amber-100 text-amber-700"
+          : "bg-emerald-100 text-emerald-700";
+
+  const syncTitle =
+    !configured
+      ? "Supabase not configured (.env.local missing/invalid). Running local-only."
+      : loading
+        ? "Auth loading…"
+        : !session
+          ? "Not signed in. Sync is disabled until login."
+          : isOffline
+            ? "Offline. Changes are queued locally."
+            : syncState === "syncing"
+              ? "Syncing changes to server…"
+              : hasPendingChanges
+                ? "Pending local changes waiting for sync."
+                : "All changes saved.";
 
   return (
     <header className="border-b border-[var(--border)] bg-white">
@@ -32,41 +52,34 @@ export function SiteHeader() {
           {/* <p className="text-sm text-slate-600">AI literacy planning workspace.</p> */}
         </div>
         <nav className="flex items-center gap-3 text-sm font-medium text-slate-600">
-          {/* <span
-            title={
-              isOffline
-                ? "No network connection. Changes are saved locally."
-                : syncState === "syncing"
-                  ? "Syncing changes to server…"
-                  : "All changes saved."
-            }
+          <span
+            title={syncTitle}
             className={`rounded-full px-3 py-2 text-xs font-semibold ${syncClass}`}
           >
             {syncLabel}
-          </span> */}
+          </span>
 
-          {/* {session ? (
+          <Link className="rounded-full bg-blue-200 px-4 py-2 text-white hover:bg-blue-300" href="/dashboard">
+            Dashboard
+          </Link>
+          {session ? (
             <>
               <span className="rounded-full bg-slate-100 px-3 py-2 text-xs font-semibold text-slate-700 truncate max-w-40">
                 {user?.email}
               </span>
               <button
                 type="button"
-                className="rounded-full border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+                className="rounded-full border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
                 onClick={() => signOut()}
               >
-                Sign out
+                Logout
               </button>
             </>
           ) : (
-            <Link className="rounded-full px-3 py-2 hover:bg-slate-100" href="/login">
+            <Link className="rounded-full border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50" href="/login">
               Login
             </Link>
-          )} */}
-          
-          <Link className="rounded-full bg-blue-200 px-4 py-2 text-white hover:bg-blue-300" href="/dashboard">
-            Dashboard
-          </Link>
+          )}
         </nav>
       </div>
     </header>

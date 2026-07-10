@@ -55,7 +55,20 @@ export default function DashboardPage() {
   });
 
   const programmes = useMemo(
-    () => [...state.programmes].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)),
+    () =>
+      [...state.programmes].sort((a, b) => {
+        const updatedAtDiff = b.updatedAt.localeCompare(a.updatedAt);
+        if (updatedAtDiff !== 0) {
+          return updatedAtDiff;
+        }
+
+        const nameDiff = a.name.localeCompare(b.name);
+        if (nameDiff !== 0) {
+          return nameDiff;
+        }
+
+        return a.id.localeCompare(b.id);
+      }),
     [state.programmes],
   );
 

@@ -9,8 +9,11 @@ export type IdbProgramme = {
   name: string;
   description: string;
   years: number;
+  ownerId?: string;
   ownerEmail: string;
   role: "owner" | "editor" | "viewer";
+  publicAccessEnabled?: boolean;
+  publicAccessToken?: string | null;
   updatedAt: string;
   syncStatus: SyncStatus;
   localUpdatedAt: string;
