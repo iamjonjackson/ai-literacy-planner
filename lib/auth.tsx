@@ -39,7 +39,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<AuthState>({
     session: null,
     user: null,
-    loading: configured,
+    loading: true,
     configured,
   });
 

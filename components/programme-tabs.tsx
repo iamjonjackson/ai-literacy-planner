@@ -2,9 +2,9 @@
 
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
-import { frameworkCompetencies } from "@/lib/framework";
+// import { frameworkCompetencies } from "@/lib/framework";
 import { buildProgrammeRoute, demoProgrammeId, programmeTabs } from "@/lib/programme";
-import { useAppData } from "@/lib/app-data";
+// import { useAppData } from "@/lib/app-data";
 
 type ProgrammeTabsProps = {
   programmeId: string;
@@ -14,14 +14,14 @@ export function ProgrammeTabs({ programmeId }: ProgrammeTabsProps) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const publicToken = searchParams.get("publicToken");
-  const { state, isViewOnly } = useAppData();
-  const viewOnly = isViewOnly(programmeId);
-  const coveredCompetencies = new Set(
-    state.learningOutcomes
-      .filter((learningOutcome) => learningOutcome.programmeId === programmeId && learningOutcome.competencyId)
-      .map((learningOutcome) => learningOutcome.competencyId),
-  );
-  const designIncomplete = coveredCompetencies.size < frameworkCompetencies.length;
+  // const { state, isViewOnly } = useAppData();
+  // const viewOnly = isViewOnly(programmeId);
+  // const coveredCompetencies = new Set(
+  //   state.learningOutcomes
+  //     .filter((learningOutcome) => learningOutcome.programmeId === programmeId && learningOutcome.competencyId)
+  //     .map((learningOutcome) => learningOutcome.competencyId),
+  // );
+  // const designIncomplete = coveredCompetencies.size < frameworkCompetencies.length;
 
   return (
     <div className="space-y-3">

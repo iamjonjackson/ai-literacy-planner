@@ -10,7 +10,6 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { useSearchParams } from "next/navigation";
 import { demoProgrammeId } from "@/lib/programme";
 import {
   loadAllFromIdb,
@@ -346,7 +345,6 @@ function deleteModulesFromState(
 }
 
 export function AppDataProvider({ children }: { children: ReactNode }) {
-  const searchParams = useSearchParams();
   const [state, setState] = useState<AppDataState>(initialState);
   const [isOffline, setIsOffline] = useState(false);
   const [syncState, setSyncState] = useState<SyncState>("idle");
@@ -516,8 +514,14 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
   }, []);
 
   // ── Public shared programme loader (readonly) ────────────────────────────
-  const sharedToken = searchParams.get("publicToken");
-  const sharedQueryProgrammeId = searchParams.get("programme");
+  const sharedToken =
+    typeof window !== "undefined"
+      ? new URLSearchParams(window.location.search).get("publicToken")
+      : null;
+  const sharedQueryProgrammeId =
+    typeof window !== "undefined"
+      ? new URLSearchParams(window.location.search).get("programme")
+      : null;
   const sharedRouteKey = `${sharedToken ?? ""}|${sharedQueryProgrammeId ?? ""}`;
 
   const loadPublicProgrammeSnapshot = useCallback(async () => {

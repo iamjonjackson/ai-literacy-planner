@@ -19,15 +19,6 @@ export function AuthGuard({ children }: { children: ReactNode }) {
     }
   }, [loading, configured, session, hasPublicToken, router]);
 
-  // While auth state is loading, show a minimal spinner
-  if (loading) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-slate-50">
-        <div className="h-8 w-8 animate-spin rounded-full border-4 border-blue-600 border-t-transparent" />
-      </div>
-    );
-  }
-
   // No Supabase configured → allow access in local-only mode
   if (!configured) {
     if (requireAuth) {
@@ -45,6 +36,15 @@ export function AuthGuard({ children }: { children: ReactNode }) {
     }
 
     return <>{children}</>;
+  }
+
+  // While configured auth state is loading, show a minimal spinner
+  if (loading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-slate-50">
+        <div className="h-8 w-8 animate-spin rounded-full border-4 border-blue-600 border-t-transparent" />
+      </div>
+    );
   }
 
   if (hasPublicToken) {
