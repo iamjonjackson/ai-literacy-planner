@@ -45,7 +45,19 @@ function DesignPageContent() {
 
   const selectedCompetency = frameworkCompetencies.find((competency) => competency.id === selectedCompetencyId);
   const competencyOutcomes = useMemo(
-    () => learningOutcomes.filter((learningOutcome) => learningOutcome.competencyId === selectedCompetencyId),
+    () =>
+      learningOutcomes
+        .filter((learningOutcome) => learningOutcome.competencyId === selectedCompetencyId)
+        .sort((left, right) => {
+          const leftUpdatedAt = left.updatedAt ?? "";
+          const rightUpdatedAt = right.updatedAt ?? "";
+          const updatedAtComparison = leftUpdatedAt.localeCompare(rightUpdatedAt);
+          if (updatedAtComparison !== 0) {
+            return updatedAtComparison;
+          }
+
+          return (left.id ?? "").localeCompare(right.id ?? "");
+        }),
     [learningOutcomes, selectedCompetencyId],
   );
 

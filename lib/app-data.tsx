@@ -572,7 +572,12 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
 
       const [modulesRes, learningOutcomesRes, assessmentsRes] = await Promise.all([
         supabase.from("modules").select("*").eq("programme_id", programmeId),
-        supabase.from("learning_outcomes").select("*").eq("programme_id", programmeId),
+        supabase
+          .from("learning_outcomes")
+          .select("*")
+          .eq("programme_id", programmeId)
+          .order("updated_at", { ascending: true })
+          .order("id", { ascending: true }),
         supabase.from("assessments").select("*").eq("programme_id", programmeId),
       ]);
 
@@ -1295,7 +1300,8 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
                 .from("learning_outcomes")
                 .select("*")
                 .gt("updated_at", pullCursors.learningOutcomes ?? "1970-01-01T00:00:00.000Z")
-                .order("updated_at", { ascending: true }),
+                .order("updated_at", { ascending: true })
+                .order("id", { ascending: true }),
               supabase
                 .from("assessments")
                 .select("*")
@@ -1305,7 +1311,11 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
           : await Promise.all([
               supabase.from("programmes").select("*").order("updated_at", { ascending: true }),
               supabase.from("modules").select("*").order("updated_at", { ascending: true }),
-              supabase.from("learning_outcomes").select("*").order("updated_at", { ascending: true }),
+              supabase
+                .from("learning_outcomes")
+                .select("*")
+                .order("updated_at", { ascending: true })
+                .order("id", { ascending: true }),
               supabase.from("assessments").select("*").order("updated_at", { ascending: true }),
             ]);
 
