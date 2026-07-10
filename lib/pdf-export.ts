@@ -258,26 +258,6 @@ function safeFilename(name: string) {
   return name.replaceAll(/[^\w\s-]/g, "").replaceAll(/\s+/g, "-").toLowerCase();
 }
 
-export function downloadSummaryPdf(data: ExportData) {
-  const doc = new jsPDF({ orientation: "landscape" });
-
-  addCoverPage(doc, data.programme);
-  doc.addPage();
-
-  let y = 20;
-  y = sectionHeading(doc, y, "Programme Overview");
-  y = addProgrammeStats(doc, y, data) + 10;
-  y = sectionHeading(doc, y, "Module Grid");
-  y = addModuleGrid(doc, y, data) + 10;
-  doc.addPage();
-  y = 20;
-  y = sectionHeading(doc, y, "Assessment Summary");
-  addAssessmentSummary(doc, y, data);
-
-  const datePart = new Date().toISOString().slice(0, 10);
-  doc.save(`${safeFilename(data.programme.name)}-summary-${datePart}.pdf`);
-}
-
 export function downloadFullDetailPdf(data: ExportData) {
   const doc = new jsPDF({ orientation: "landscape" });
 

@@ -4,8 +4,8 @@ import { Suspense, useRef } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useAppData } from "@/lib/app-data";
 import { buildProgrammeRoute } from "@/lib/programme";
-import { downloadSummaryPdf, downloadFullDetailPdf } from "@/lib/pdf-export";
-import { downloadSummaryXlsx, downloadFullDetailXlsx } from "@/lib/xlsx-export";
+import { downloadFullDetailPdf } from "@/lib/pdf-export";
+import { downloadFullDetailXlsx } from "@/lib/xlsx-export";
 
 function ImplementPageContent() {
   const params = useParams<{ id: string }>();
@@ -70,89 +70,44 @@ function ImplementPageContent() {
       <section className="space-y-8 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
         <div>
           <p className="text-sm font-medium uppercase tracking-[0.2em] text-blue-600">Implement</p>
-          <h2 className="mt-2 text-2xl font-semibold text-slate-900">Exports and backup</h2>
+          <h2 className="mt-2 text-2xl font-semibold text-slate-900">Export your implementation report</h2>
           <p className="mt-2 text-sm text-slate-600">
-            Download your programme plan as PDF, XLSX, or JSON.
+            Download your data as PDF, XLSX, or JSON.
           </p>
         </div>
 
-        {/* Section A — PDF Export */}
-        <div>
-          <h3 className="text-base font-semibold text-slate-900">Section A — PDF export</h3>
-          <p className="mt-1 text-sm text-slate-600">Download a formatted PDF of your programme plan.</p>
-          <div className="mt-4 grid gap-4 md:grid-cols-2">
-            <article className="rounded-2xl border border-slate-200 p-4">
-              <h4 className="font-semibold text-slate-900">Summary PDF</h4>
-              <p className="mt-2 text-sm text-slate-600">
-                Cover page · programme grid · coverage stats · assessment summary.
-              </p>
-              <button
-                type="button"
-                className="mt-4 rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50"
-                disabled={!exportData}
-                onClick={() => exportData && downloadSummaryPdf(exportData)}
-              >
-                Download summary PDF
-              </button>
-            </article>
-
-            <article className="rounded-2xl border border-slate-200 p-4">
-              <h4 className="font-semibold text-slate-900">Full detail PDF</h4>
-              <p className="mt-2 text-sm text-slate-600">
-                Everything in the summary, plus competency LOs · LO-to-module mapping · per-module assessments.
-              </p>
-              <button
+        <div className="grid gap-4 md:grid-cols-2">
+          <article className="rounded-2xl border border-slate-200 p-4">
+            <h3 className="text-base font-semibold text-slate-900">PDF export</h3>
+            <p className="mt-1 text-sm text-slate-600">Download a formatted PDF of your programme plan.</p>
+            <button
                 type="button"
                 className="mt-4 rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50"
                 disabled={!exportData}
                 onClick={() => exportData && downloadFullDetailPdf(exportData)}
               >
-                Download full PDF
+                Download PDF
               </button>
-            </article>
-          </div>
-        </div>
+          </article>
 
-        {/* Section B — XLSX Export */}
-        <div>
-          <h3 className="text-base font-semibold text-slate-900">Section B — XLSX export</h3>
-          <p className="mt-1 text-sm text-slate-600">Download a spreadsheet of your programme data.</p>
-          <div className="mt-4 grid gap-4 md:grid-cols-2">
-            <article className="rounded-2xl border border-slate-200 p-4">
-              <h4 className="font-semibold text-slate-900">Summary XLSX</h4>
-              <p className="mt-2 text-sm text-slate-600">
-                Sheet 1: Programme overview · Sheet 2: Coverage stats · Sheet 3: Assessment summary.
-              </p>
-              <button
-                type="button"
-                className="mt-4 rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50"
-                disabled={!exportData}
-                onClick={() => exportData && downloadSummaryXlsx(exportData)}
-              >
-                Download summary XLSX
-              </button>
-            </article>
-
-            <article className="rounded-2xl border border-slate-200 p-4">
-              <h4 className="font-semibold text-slate-900">Full detail XLSX</h4>
-              <p className="mt-2 text-sm text-slate-600">
-                Sheet 1: Programme info · Sheet 2: All LOs · Sheet 3: Module list · Sheet 4: Assessments · Sheet 5: Coverage matrix.
-              </p>
+          <article className="rounded-2xl border border-slate-200 p-4">
+            <h3 className="text-base font-semibold text-slate-900">XLSX export</h3>
+            <p className="mt-1 text-sm text-slate-600">Download a spreadsheet of your programme data.</p>
               <button
                 type="button"
                 className="mt-4 rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50"
                 disabled={!exportData}
                 onClick={() => exportData && downloadFullDetailXlsx(exportData)}
               >
-                Download full XLSX
+                Download XLSX
               </button>
-            </article>
-          </div>
+          </article>
+          
         </div>
 
         {/* Section C — JSON Backup / Restore */}
         <div>
-          <h3 className="text-base font-semibold text-slate-900">Section C — JSON backup / restore</h3>
+          <h2 className="font-semibold text-slate-900 text-2xl">JSON backup / restore</h2>
           <p className="mt-1 text-sm text-slate-600">Export a full programme backup or restore from a previous export.</p>
           <div className="mt-4 grid gap-4 md:grid-cols-2">
             <article className="rounded-2xl border border-slate-200 p-4">

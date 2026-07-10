@@ -137,17 +137,6 @@ function coverageMatrixRows(data: ExportData) {
   });
 }
 
-export function downloadSummaryXlsx(data: ExportData) {
-  const wb = XLSX.utils.book_new();
-
-  XLSX.utils.book_append_sheet(wb, makeSheet(programmeOverviewRows(data)), "Programme Overview");
-  XLSX.utils.book_append_sheet(wb, makeSheet(coverageStatsRows(data)), "Coverage Stats");
-  XLSX.utils.book_append_sheet(wb, makeSheet(assessmentSummaryRows(data)), "Assessment Summary");
-
-  const datePart = new Date().toISOString().slice(0, 10);
-  XLSX.writeFile(wb, `${safeFilename(data.programme.name)}-summary-${datePart}.xlsx`);
-}
-
 export function downloadFullDetailXlsx(data: ExportData) {
   const wb = XLSX.utils.book_new();
 
@@ -155,6 +144,7 @@ export function downloadFullDetailXlsx(data: ExportData) {
   XLSX.utils.book_append_sheet(wb, makeSheet(allLosRows(data)), "All LOs");
   XLSX.utils.book_append_sheet(wb, makeSheet(moduleListRows(data)), "Module List");
   XLSX.utils.book_append_sheet(wb, makeSheet(assessmentSummaryRows(data)), "Assessments");
+  XLSX.utils.book_append_sheet(wb, makeSheet(coverageStatsRows(data)), "Coverage Stats");
   XLSX.utils.book_append_sheet(wb, makeSheet(coverageMatrixRows(data)), "Coverage Matrix");
 
   const datePart = new Date().toISOString().slice(0, 10);
