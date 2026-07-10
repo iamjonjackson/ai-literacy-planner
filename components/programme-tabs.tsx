@@ -51,7 +51,7 @@ export function ProgrammeTabs({ programmeId }: ProgrammeTabsProps) {
             >
               <span className={`flex items-center gap-2 ${isActive ? "text-white" : ""}`}>
                 <span>{tab.label}</span>
-                {tab.slug === "design" && designIncomplete && !isActive ? (
+                {/* {tab.slug === "design" && designIncomplete && !isActive ? (
                   <span
                     aria-label="Design tab incomplete"
                     className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-amber-100 px-1.5 text-[10px] font-semibold text-amber-700"
@@ -59,7 +59,7 @@ export function ProgrammeTabs({ programmeId }: ProgrammeTabsProps) {
                   >
                     !
                   </span>
-                ) : null}
+                ) : null} */}
               </span>
             </Link>
           );
