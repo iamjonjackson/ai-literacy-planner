@@ -77,7 +77,10 @@ function ImplementPageContent() {
         </div>
 
         <div className="grid gap-4 md:grid-cols-2">
-          <article className="rounded-2xl border border-slate-200 p-4">
+
+          <p>Coming soon...</p>
+
+          {/* <article className="rounded-2xl border border-slate-200 p-4">
             <h3 className="text-base font-semibold text-slate-900">PDF export</h3>
             <p className="mt-1 text-sm text-slate-600">Download a formatted PDF of your programme plan.</p>
             <button
@@ -101,7 +104,7 @@ function ImplementPageContent() {
               >
                 Download XLSX
               </button>
-          </article>
+          </article> */}
           
         </div>
 
@@ -161,14 +164,14 @@ function ImplementPageContent() {
             <dt>Modules</dt>
             <dd className="font-semibold text-slate-900">{modules.length}</dd>
           </div>
-          <div className="flex items-center justify-between gap-2">
+          {/* <div className="flex items-center justify-between gap-2">
             <dt>Learning outcomes</dt>
             <dd className="font-semibold text-slate-900">{learningOutcomes.length}</dd>
           </div>
           <div className="flex items-center justify-between gap-2">
             <dt>Assessments</dt>
             <dd className="font-semibold text-slate-900">{assessments.length}</dd>
-          </div>
+          </div> */}
         </dl>
       </aside>
     </div>
