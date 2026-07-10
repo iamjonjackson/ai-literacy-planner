@@ -1,6 +1,6 @@
 "use client";
 
-import { ReactNode, useState } from "react";
+import { ReactNode, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { PageShell } from "@/components/page-shell";
 import { ProgrammeTabs } from "@/components/programme-tabs";
@@ -21,6 +21,7 @@ export function ProgrammeShell({ programmeId, children }: ProgrammeShellProps) {
   const {
     state,
     isPublicSharedView,
+    setPublicRouteContext,
     isViewOnly,
     setProgrammePublicAccess,
     getProgrammeShareUrl,
@@ -42,6 +43,10 @@ export function ProgrammeShell({ programmeId, children }: ProgrammeShellProps) {
   const shareUrl = getProgrammeShareUrl(resolvedProgrammeId);
   const aiAgentUrl = programme?.aiAgentUrl?.trim() ?? "";
   const [shareOpen, setShareOpen] = useState(false);
+
+  useEffect(() => {
+    setPublicRouteContext(publicToken, publicToken ? resolvedProgrammeId : null);
+  }, [publicToken, resolvedProgrammeId, setPublicRouteContext]);
 
   return (
     <AuthGuard>

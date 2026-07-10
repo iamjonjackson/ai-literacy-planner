@@ -155,6 +155,7 @@ type AppDataContextValue = {
   pendingCount: number;
   isPublicSharedView: boolean;
   sharedProgrammeId: string | null;
+  setPublicRouteContext: (token: string | null, programmeId: string | null) => void;
   isViewOnly: (programmeId: string) => boolean;
   createProgramme: (input: { name: string; description: string; years: number }) => string;
   updateProgramme: (programmeId: string, patch: Partial<Pick<Programme, "name" | "description" | "years" | "aiAgentUrl">>) => void;
@@ -272,6 +273,14 @@ function isUuidLike(value: string) {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
 }
 
+function hasPublicTokenInLocation() {
+  if (typeof window === "undefined") {
+    return false;
+  }
+
+  return Boolean(new URLSearchParams(window.location.search).get("publicToken"));
+}
+
 function getModuleDeletionImpactFromState(
   state: AppDataState,
   moduleId: string,
@@ -351,6 +360,17 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
   const [pendingCount, setPendingCount] = useState(0);
   const [isPublicSharedView, setIsPublicSharedView] = useState(false);
   const [sharedProgrammeId, setSharedProgrammeId] = useState<string | null>(null);
+  const [publicRouteContext, setPublicRouteContextState] = useState<{ token: string | null; programmeId: string | null }>(() => {
+    if (typeof window === "undefined") {
+      return { token: null, programmeId: null };
+    }
+
+    const params = new URLSearchParams(window.location.search);
+    return {
+      token: params.get("publicToken"),
+      programmeId: params.get("programme"),
+    };
+  });
   const idbLoadedRef = useRef(false);
   const loadedPublicRef = useRef<string | null>(null);
   const syncIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -472,13 +492,31 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
     [isPublicSharedView, sharedProgrammeId, state.programmes],
   );
 
+  const setPublicRouteContext = useCallback((token: string | null, programmeId: string | null) => {
+    setPublicRouteContextState((current) => {
+      if (current.token === token && current.programmeId === programmeId) {
+        return current;
+      }
+
+      return { token, programmeId };
+    });
+  }, []);
+
   // ── Load from IndexedDB on mount ──────────────────────────────────────────
   useEffect(() => {
     if (idbLoadedRef.current) return;
     idbLoadedRef.current = true;
 
+    if (hasPublicTokenInLocation()) {
+      return;
+    }
+
     loadAllFromIdb()
       .then(({ programmes, modules, learningOutcomes, assessments }) => {
+        if (hasPublicTokenInLocation()) {
+          return;
+        }
+
         if (
           programmes.length > 0 ||
           modules.length > 0 ||
@@ -496,6 +534,10 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
         }
 
         if (typeof window !== "undefined") {
+          if (hasPublicTokenInLocation()) {
+            return;
+          }
+
           const seededKey = "ai-literacy-planner:sample-seeded";
           const alreadySeeded = window.localStorage.getItem(seededKey) === "true";
           if (!alreadySeeded) {
@@ -514,14 +556,8 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
   }, []);
 
   // ── Public shared programme loader (readonly) ────────────────────────────
-  const sharedToken =
-    typeof window !== "undefined"
-      ? new URLSearchParams(window.location.search).get("publicToken")
-      : null;
-  const sharedQueryProgrammeId =
-    typeof window !== "undefined"
-      ? new URLSearchParams(window.location.search).get("programme")
-      : null;
+  const sharedToken = publicRouteContext.token;
+  const sharedQueryProgrammeId = publicRouteContext.programmeId;
   const sharedRouteKey = `${sharedToken ?? ""}|${sharedQueryProgrammeId ?? ""}`;
 
   const loadPublicProgrammeSnapshot = useCallback(async () => {
@@ -2227,6 +2263,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
       pendingCount,
       isPublicSharedView,
       sharedProgrammeId,
+      setPublicRouteContext,
       isViewOnly,
       createProgramme,
       updateProgramme,
@@ -2259,6 +2296,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
       pendingCount,
       isPublicSharedView,
       sharedProgrammeId,
+      setPublicRouteContext,
       isViewOnly,
       createProgramme,
       updateProgramme,
