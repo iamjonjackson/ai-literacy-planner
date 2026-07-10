@@ -26,12 +26,7 @@ export function ProgrammeTabs({ programmeId }: ProgrammeTabsProps) {
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between gap-3">
-        <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Programme Tabs</p>
-        {viewOnly ? (
-          <span className="rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-800">
-            Read-only mode
-          </span>
-        ) : null}
+        {/* <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Programme Tabs</p> */}
       </div>
       <nav aria-label="Programme tabs" className="flex flex-wrap gap-2">
         {programmeTabs.map((tab) => {

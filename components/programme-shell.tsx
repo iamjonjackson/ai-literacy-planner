@@ -59,13 +59,13 @@ export function ProgrammeShell({ programmeId, children }: ProgrammeShellProps) {
               <span className="rounded-full bg-slate-100 px-4 py-2 font-medium text-slate-700">
                 {viewOnly ? "viewer" : programme?.role ?? "owner"}
               </span>
+              {viewOnly ? (
+                <span className="rounded-full border border-amber-200 bg-amber-50 px-3 py-1 font-semibold text-amber-800">
+                  Read-only mode
+                </span>
+              ) : null}
             </div>
           </div>
-          {viewOnly ? (
-            <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-              You have view-only access to this programme.
-            </div>
-          ) : null}
           <ProgrammeTabs programmeId={resolvedProgrammeId} />
         </div>
         {children}
