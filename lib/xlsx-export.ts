@@ -177,21 +177,38 @@ function assessmentSummaryRows(data: ExportData): XLSX.WorkSheet {
 
 function allLosRows(data: ExportData): XLSX.WorkSheet {
   const moduleMap = new Map(data.modules.map((m) => [m.id, m]));
-  const rows = data.learningOutcomes.map((lo) => {
-    const comp = frameworkCompetencies.find((c) => c.id === lo.competencyId);
-    const mod = lo.moduleId ? moduleMap.get(lo.moduleId) : undefined;
-    return {
-      "Module Code": mod?.code || "",
-      "Module": mod?.name || "Unmapped",
-      "Year": mod?.year ?? "",
-      "LO Text": lo.text,
-      "AI Competency ID": comp?.id || "",
-      "AI Competency Title": comp?.title || "",
-      "Category": lo.category || "",
-    };
-  });
   
-  const ws = makeSheet(rows);
+  // Filter to only include LOs that are linked to a module, then sort by module code then year
+  const sortedLos = [...data.learningOutcomes]
+    .filter((lo) => lo.moduleId !== null)
+    .sort((a, b) => {
+      const aMod = a.moduleId ? moduleMap.get(a.moduleId) : null;
+      const bMod = b.moduleId ? moduleMap.get(b.moduleId) : null;
+      
+      if (!aMod || !bMod) return 0;
+      
+      // Primary sort by module code
+      const codeCompare = (aMod.code || "").localeCompare(bMod.code || "");
+      if (codeCompare !== 0) return codeCompare;
+      
+      // Secondary sort by year
+      return aMod.year - bMod.year;
+    })
+    .map((lo) => {
+      const comp = frameworkCompetencies.find((c) => c.id === lo.competencyId);
+      const mod = lo.moduleId ? moduleMap.get(lo.moduleId) : undefined;
+      return {
+        "Module Code": mod?.code || "",
+        "Module": mod?.name || "Unmapped",
+        "Year": mod?.year ?? "",
+        "LO Text": lo.text,
+        "AI Competency ID": comp?.id || "",
+        "AI Competency Title": comp?.title || "",
+        "Category": lo.category || "",
+      };
+    });
+  
+  const ws = makeSheet(sortedLos);
   if (ws["!ref"]) {
     ws["!autofilter"] = { ref: ws["!ref"] };
   }
