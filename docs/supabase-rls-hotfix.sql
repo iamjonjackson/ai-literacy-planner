@@ -47,7 +47,10 @@ as $$
     select 1
     from public.programme_access pa
     where pa.programme_id = prog_id
-      and pa.grantee_id = auth.uid()
+      and (
+        pa.grantee_id = auth.uid()
+        or lower(pa.grantee_email) = lower(coalesce(auth.jwt() ->> 'email', ''))
+      )
   );
 $$;
 
@@ -61,7 +64,10 @@ as $$
     select 1
     from public.programme_access pa
     where pa.programme_id = prog_id
-      and pa.grantee_id = auth.uid()
+      and (
+        pa.grantee_id = auth.uid()
+        or lower(pa.grantee_email) = lower(coalesce(auth.jwt() ->> 'email', ''))
+      )
       and pa.role = 'editor'
   );
 $$;
@@ -90,19 +96,8 @@ create policy "Owners can delete their programmes"
 
 drop policy if exists "Shared users can read programmes" on public.programmes;
 create policy "Shared users can read programmes"
-  on public.programmes
-  for select
-  using (
-    exists (
-      select 1
-      from public.programme_access pa
-      where pa.programme_id = id
-        and (
-          pa.grantee_id = auth.uid()
-          or lower(pa.grantee_email) = lower(coalesce(auth.jwt() ->> 'email', ''))
-        )
-    )
-  );
+  on public.programmes for select
+  using (public.can_access_programme(id));
 
 create policy "Editors can update programmes"
   on public.programmes for update

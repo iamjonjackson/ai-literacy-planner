@@ -24,25 +24,25 @@ The current view/state should be maintained on refresh so that the current tab i
 
 ## 2. Tech Stack
 
-| Concern | Choice |
-| --- | --- |
-| Framework | Next.js (App Router) |
-| Language | TypeScript |
-| Styling | Tailwind CSS (light mode only) |
-| Auth | Supabase Auth (magic link / passwordless email) |
-| Database | Supabase (Postgres) — source of truth |
-| Local cache | IndexedDB via `idb` (offline support + performance) |
-| Supabase client | `@supabase/supabase-js` |
-| Drag and drop | `@dnd-kit/core` + `@dnd-kit/sortable` |
-| PDF export | `jsPDF` + `jspdf-autotable` |
-| XLSX export | `xlsx` (SheetJS) |
-| Markdown rendering | `react-markdown` + `remark-gfm` |
-| Autocomplete / search | `fuse.js` (fuzzy search) |
-| CSV parsing | `papaparse` (client-side, handles quoted fields) |
-| Icons | `lucide-react` |
-| Content source | `.md` files in `/content/` compiled to JSON at build time |
-| Static export | `next export` (`output: 'export'`) — deployable to GitHub Pages |
-| CI/CD | GitHub Actions (build + deploy) |
+| Concern               | Choice                                                          |
+| --------------------- | --------------------------------------------------------------- |
+| Framework             | Next.js (App Router)                                            |
+| Language              | TypeScript                                                      |
+| Styling               | Tailwind CSS (light mode only)                                  |
+| Auth                  | Supabase Auth (magic link / passwordless email)                 |
+| Database              | Supabase (Postgres) — source of truth                           |
+| Local cache           | IndexedDB via `idb` (offline support + performance)             |
+| Supabase client       | `@supabase/supabase-js`                                         |
+| Drag and drop         | `@dnd-kit/core` + `@dnd-kit/sortable`                           |
+| PDF export            | `jsPDF` + `jspdf-autotable`                                     |
+| XLSX export           | `xlsx` (SheetJS)                                                |
+| Markdown rendering    | `react-markdown` + `remark-gfm`                                 |
+| Autocomplete / search | `fuse.js` (fuzzy search)                                        |
+| CSV parsing           | `papaparse` (client-side, handles quoted fields)                |
+| Icons                 | `lucide-react`                                                  |
+| Content source        | `.md` files in `/content/` compiled to JSON at build time       |
+| Static export         | `next export` (`output: 'export'`) — deployable to GitHub Pages |
+| CI/CD                 | GitHub Actions (build + deploy)                                 |
 
 ---
 
@@ -137,12 +137,12 @@ scripts/build-content.ts   ← runs via "prebuild" npm script
 
 ```javascript
 const nextConfig = {
-  output: 'export',
+  output: "export",
   trailingSlash: true,
   images: { unoptimized: true },
-  basePath: '/repo-name',
-}
-module.exports = nextConfig
+  basePath: "/repo-name",
+};
+module.exports = nextConfig;
 ```
 
 ### 5.2 File Structure
@@ -282,18 +282,10 @@ create policy "Owners can delete their programmes"
   using (public.is_programme_owner(id));
 
 -- Viewers and editors can read programmes they have access to
-create policy "Shared users can read programmes"
-  on public.programmes for select
-  using (
-    exists (
-      select 1 from public.programme_access pa
-      where pa.programme_id = id
-        and (
-          pa.grantee_id = auth.uid()
-          or lower(pa.grantee_email) = lower(coalesce(auth.jwt() ->> 'email', ''))
-        )
-    )
-  );
+DROP POLICY IF EXISTS "Shared users can read programmes" ON public.programmes;
+CREATE POLICY "Shared users can read programmes"
+  ON public.programmes FOR SELECT
+  USING (public.can_access_programme(id));
 
 -- Optional public readonly sharing (anon role) via tokenized link
 create policy "Anon can read publicly shared programmes"
@@ -432,12 +424,20 @@ alter table public.assessment_los enable row level security;
 
 -- ─── RLS HELPER: can_access_programme ────────────────────────────────────────
 -- Reusable function to check read access (owner OR granted user)
-create or replace function public.can_access_programme(prog_id uuid)
-returns boolean language sql security definer as $$
-  select public.is_programme_owner(prog_id)
-  or exists (
-    select 1 from public.programme_access pa
-    where pa.programme_id = prog_id and pa.grantee_id = auth.uid()
+CREATE OR REPLACE FUNCTION public.can_access_programme(prog_id uuid)
+RETURNS boolean
+LANGUAGE sql
+SECURITY DEFINER
+AS $$
+  SELECT public.is_programme_owner(prog_id)
+  OR EXISTS (
+    SELECT 1
+    FROM public.programme_access pa
+    WHERE pa.programme_id = prog_id
+      AND (
+        pa.grantee_id = auth.uid()
+        OR lower(pa.grantee_email) = lower(coalesce(auth.jwt() ->> 'email', ''))
+      )
   );
 $$;
 
@@ -448,7 +448,10 @@ returns boolean language sql security definer as $$
   or exists (
     select 1 from public.programme_access pa
     where pa.programme_id = prog_id
-      and pa.grantee_id = auth.uid()
+      and (
+        pa.grantee_id = auth.uid()
+        or lower(pa.grantee_email) = lower(coalesce(auth.jwt() ->> 'email', ''))
+      )
       and pa.role = 'editor'
   );
 $$;
@@ -597,27 +600,27 @@ IndexedDB mirrors the Supabase tables and adds a `syncStatus` field to each reco
 Each store mirrors its Supabase table, with two additional fields:
 
 ```typescript
-syncStatus: 'synced' | 'pending'   // local sync state
-localUpdatedAt: string             // ISO 8601 — time of last local write
+syncStatus: "synced" | "pending"; // local sync state
+localUpdatedAt: string; // ISO 8601 — time of last local write
 ```
 
 **Stores:** `profiles`, `programmes`, `programme_access`, `modules`, `learning_outcomes`, `assessments`, `assessment_los`
 
 #### IndexedDB Indexes
 
-| Store | Index Name | Key Path | Unique |  |  |  |  |  |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| programmes | `by-owner` | `owner_id` | false |  |  |  |  |  |
-| programme\\_access | `by-programme` | `programme_id` | false |  |  |  |  |  |
-| programme\\_access | `by-grantee` | `grantee_id` | false |  |  |  |  |  |
-| modules | `by-programme` | `programme_id` | false |  |  |  |  |  |
-| modules | `by-programme-year` | `[programme_id, year]` | false |  |  |  |  |  |
-| learning\\_outcomes | `by-programme` | `programme_id` | false |  |  |  |  |  |
-| learning\\_outcomes | `by-competency` | `[programme_id, competency_id]` | false |  |  |  |  |  |
-| learning\\_outcomes | `by-category` | `[programme_id, category]` | false |  | learning\\_outcomes | `by-module` | `module_id` | false |
-| assessments | `by-module` | `module_id` | false |  |  |  |  |  |
-| assessments | `by-programme` | `programme_id` | false |  |  |  |  |  |
-| assessment\\_los | `by-assessment` | `assessment_id` | false |  |  |  |  |  |
+| Store                | Index Name          | Key Path                        | Unique |     |                      |             |             |       |
+| -------------------- | ------------------- | ------------------------------- | ------ | --- | -------------------- | ----------- | ----------- | ----- |
+| programmes           | `by-owner`          | `owner_id`                      | false  |     |                      |             |             |       |
+| programme\\\_access  | `by-programme`      | `programme_id`                  | false  |     |                      |             |             |       |
+| programme\\\_access  | `by-grantee`        | `grantee_id`                    | false  |     |                      |             |             |       |
+| modules              | `by-programme`      | `programme_id`                  | false  |     |                      |             |             |       |
+| modules              | `by-programme-year` | `[programme_id, year]`          | false  |     |                      |             |             |       |
+| learning\\\_outcomes | `by-programme`      | `programme_id`                  | false  |     |                      |             |             |       |
+| learning\\\_outcomes | `by-competency`     | `[programme_id, competency_id]` | false  |     |                      |             |             |       |
+| learning\\\_outcomes | `by-category`       | `[programme_id, category]`      | false  |     | learning\\\_outcomes | `by-module` | `module_id` | false |
+| assessments          | `by-module`         | `module_id`                     | false  |     |                      |             |             |       |
+| assessments          | `by-programme`      | `programme_id`                  | false  |     |                      |             |             |       |
+| assessment\\\_los    | `by-assessment`     | `assessment_id`                 | false  |     |                      |             |             |       |
 
 #### Sync Notes
 
@@ -632,11 +635,11 @@ localUpdatedAt: string             // ISO 8601 — time of last local write
 
 ### 7.1 Roles
 
-| Role | Can view | Can edit | Can share | Can delete programme |
-| --- | --- | --- | --- | --- |
-| **Owner** | ✅ | ✅ | ✅ | ✅ |
-| **Editor** | ✅ | ✅ | ❌ | ❌ |
-| **Viewer** | ✅ | ❌ | ❌ | ❌ |
+| Role       | Can view | Can edit | Can share | Can delete programme |
+| ---------- | -------- | -------- | --------- | -------------------- |
+| **Owner**  | ✅       | ✅       | ✅        | ✅                   |
+| **Editor** | ✅       | ✅       | ❌        | ❌                   |
+| **Viewer** | ✅       | ❌       | ❌        | ❌                   |
 
 - Only the **original creator** (owner) can delete a programme or change/revoke access
 - There is only one owner per programme; ownership cannot be transferred in v2
@@ -686,10 +689,10 @@ localUpdatedAt: string             // ISO 8601 — time of last local write
 ### 8.3 Connection & Sync Status
 
 - A small sync indicator in the navbar shows:
-    - ✅ **Synced** — all local changes have been pushed
-    - 🔄 **Syncing…** — a push or pull is in progress
-    - ⚠️ **Offline** — no connection; local changes are queued
-    - A tooltip on the indicator shows the timestamp of the last successful sync
+  - ✅ **Synced** — all local changes have been pushed
+  - 🔄 **Syncing…** — a push or pull is in progress
+  - ⚠️ **Offline** — no connection; local changes are queued
+  - A tooltip on the indicator shows the timestamp of the last successful sync
 
 ---
 
@@ -709,9 +712,9 @@ localUpdatedAt: string             // ISO 8601 — time of last local write
 - Lists all programmes the user **owns or has been granted access to** as cards showing: name, number of years, number of modules, LO coverage %, date modified, owner email (if not owned by current user), collaborator count badge (if owned and shared)
 - "New Programme" button opens a modal with fields: Programme Name (required), Description (optional), Number of Years (number input, min 1, default 3)
 - Each programme card actions:
-    - **Owner:** Open · Rename · Delete (with confirmation) · Share · Export JSON · Import JSON
-    - **Editor:** Open · Export JSON
-    - **Viewer:** Open
+  - **Owner:** Open · Rename · Delete (with confirmation) · Share · Export JSON · Import JSON
+  - **Editor:** Open · Export JSON
+  - **Viewer:** Open
 - "Import Programme" button on dashboard allows importing a previously exported JSON file (creates a new owned programme)
 
 ---
@@ -723,10 +726,10 @@ localUpdatedAt: string             // ISO 8601 — time of last local write
 - Renders content from `/content/framework/` markdown files
 - **Left panel:** Dimension list (4 dimensions). Clicking a dimension shows its competencies.
 - **Right panel:** Competency detail view showing:
-    - Competency title and ID (e.g. "1.1 Human Agency")
-    - Dimension badge
-    - Three level tabs: **Understand** · **Apply** · **Create** — each showing the level descriptor
-    - Full narrative from the `.md` body, rendered as HTML
+  - Competency title and ID (e.g. "1.1 Human Agency")
+  - Dimension badge
+  - Three level tabs: **Understand** · **Apply** · **Create** — each showing the level descriptor
+  - Full narrative from the `.md` body, rendered as HTML
 - **Top:** A search bar (Fuse.js fuzzy search across competency titles and descriptors) with results highlighting matching competencies
 - **Visual overview:** A 4×3 grid card view of all 12 competencies (switchable with the detail view via a toggle button), colour-coded by dimension. Clicking a card opens the detail view.
 - No data is written in this tab.
@@ -752,10 +755,10 @@ Corbin, T., Dawson, P. and Liu, D. (2025) "Talk is cheap: why structural assessm
 
 - Left panel: list of all 12 competencies grouped by dimension, each showing a small badge indicating how many LOs have been created for it (e.g. "2 LOs")
 - Right panel: LO editor for the selected competency, showing:
-    - Competency title and level descriptors (collapsed/expandable) for reference
-    - List of existing LOs for this competency (for this programme), each with edit and delete icons
-    - "Add Learning Outcome" button → inline text area to write the LO text, confirm with Save
-    - LOs can be reordered within a competency via drag-and-drop
+  - Competency title and level descriptors (collapsed/expandable) for reference
+  - List of existing LOs for this competency (for this programme), each with edit and delete icons
+  - "Add Learning Outcome" button → inline text area to write the LO text, confirm with Save
+  - LOs can be reordered within a competency via drag-and-drop
 
 **Coverage tracker (persistent, shown at top of tab):**
 
@@ -831,7 +834,18 @@ An imported LO's `category` and `lo_number` fields are preserved for reference b
 **CSV format expected:**
 
 ```javascript
-module_code, module_name, level, compulsory, credits, scheme, fheq_level, organiser, aims, learning_outcomes, assessments, url
+(module_code,
+  module_name,
+  level,
+  compulsory,
+  credits,
+  scheme,
+  fheq_level,
+  organiser,
+  aims,
+  learning_outcomes,
+  assessments,
+  url);
 ```
 
 **Sample row:**
@@ -845,20 +859,20 @@ LAW4001, Public Law, 4, Yes, 30, Undergraduate, Level 4, "Bob Bobinson, Jack Jac
 
 **Column mapping:**
 
-| CSV column | Maps to | Notes |
-| --- | --- | --- |
-| `module_code` | `modules.code` |  |
-| `module_name` | `modules.name` |  |
-| `level` | `modules.year` | `year = level - 3` (level 4→1, 5→2, 6→3, 7→4, 8→5). Levels outside 4–8: skip row, add to warnings |
-| `compulsory` | `modules.is_compulsory` | `true` if value = "Yes" (case-insensitive) |
-| `credits` | `modules.credits` |  |
-| `scheme` | `modules.scheme` | e.g. "Undergraduate" |
-| `fheq_level` | *(ignored)* | Redundant with `level` |
-| `organiser` | `modules.organiser` | Stored as plain text; may contain multiple comma-separated names |
-| `aims` | `modules.aims` | Long-form text; distinct from `description` |
-| `learning_outcomes` | `learning_outcomes` rows | See LO parsing below |
-| `assessments` | `assessments` rows | See assessment parsing below |
-| `url` | `modules.url` | Reference link; display only |
+| CSV column          | Maps to                  | Notes                                                                                             |
+| ------------------- | ------------------------ | ------------------------------------------------------------------------------------------------- |
+| `module_code`       | `modules.code`           |                                                                                                   |
+| `module_name`       | `modules.name`           |                                                                                                   |
+| `level`             | `modules.year`           | `year = level - 3` (level 4→1, 5→2, 6→3, 7→4, 8→5). Levels outside 4–8: skip row, add to warnings |
+| `compulsory`        | `modules.is_compulsory`  | `true` if value = "Yes" (case-insensitive)                                                        |
+| `credits`           | `modules.credits`        |                                                                                                   |
+| `scheme`            | `modules.scheme`         | e.g. "Undergraduate"                                                                              |
+| `fheq_level`        | _(ignored)_              | Redundant with `level`                                                                            |
+| `organiser`         | `modules.organiser`      | Stored as plain text; may contain multiple comma-separated names                                  |
+| `aims`              | `modules.aims`           | Long-form text; distinct from `description`                                                       |
+| `learning_outcomes` | `learning_outcomes` rows | See LO parsing below                                                                              |
+| `assessments`       | `assessments` rows       | See assessment parsing below                                                                      |
+| `url`               | `modules.url`            | Reference link; display only                                                                      |
 
 **LO parsing:** Each LO entry is separated by `;`. Each entry is split by `|` into `category | lo_number | text` (e.g. `Disciplinary Skills | 2 | Apply critical thinking...`). Creates a `learning_outcomes` record with `competency_id = null`, preserving `category` and `lo_number`.
 
@@ -870,7 +884,7 @@ LAW4001, Public Law, 4, Yes, 30, Undergraduate, Level 4, "Bob Bobinson, Jack Jac
 - Missing columns are silently ignored; only the available columns are used
 - **Level mapping:** `year = level - 3`. Levels outside 4–8 cause the row to be skipped with a warning entry
 - **Duplicate handling:** If a module with the same `code` already exists within the programme, the import performs an **upsert** — updating the existing module's fields and replacing its imported LOs and assessments (user-added LOs and any assessments with RAG/priority ratings are preserved)
-- A **preview table** is shown before confirming, listing each module (name, code, year, is\_compulsory, LO count, assessment count) with any skipped rows highlighted
+- A **preview table** is shown before confirming, listing each module (name, code, year, is_compulsory, LO count, assessment count) with any skipped rows highlighted
 - Import is processed in **batches of 10 modules** to keep the UI responsive; a progress indicator is shown during the operation (e.g. "Importing 34 of 100 modules…")
 - After import, a summary is shown: "X modules imported, Y rows skipped" with a list of skipped rows and reasons
 - Malformed rows (missing required fields like `module_name`) are **skipped with a warning**; the rest of the import proceeds
@@ -925,9 +939,9 @@ LAW4001, Public Law, 4, Yes, 30, Undergraduate, Level 4, "Bob Bobinson, Jack Jac
 - LOs (list LOs mapped to module, default all checked)
 - **Priority Rating:** Low / Medium / High (optional) — radio or segmented button. Tooltip: "How urgently does this assessment need to be reviewed for AI readiness?"
 - **RAG Status:** Red / Amber / Green (required when saving from the form) — colour-coded selector. Tooltip:
-    - 🔴 Red: Secure assessment — AI use is not permitted
-    - 🟡 Amber: Optional AI usage — students may use AI but are not required to
-    - 🟢 Green: Mandatory AI usage — students are required to engage with AI as part of this assessment
+  - 🔴 Red: Secure assessment — AI use is not permitted
+  - 🟡 Amber: Optional AI usage — students may use AI but are not required to
+  - 🟢 Green: Mandatory AI usage — students are required to engage with AI as part of this assessment
 
 **Assessment card** shows: assessment code, title, weight, duration, priority badge, RAG dot indicator, edit/delete icons (hidden for Viewers)
 
@@ -975,10 +989,10 @@ Two separate XLSX download buttons:
 - Clean, professional aesthetic appropriate for academic users
 - Primary colour: `#2563EB` (Tailwind `blue-600`)
 - Dimension colour coding (consistent across all tabs):
-    - Human-Centred Mindset: `blue`
-    - Ethics of AI: `purple`
-    - AI Techniques & Applications: `emerald`
-    - AI System Design: `orange`
+  - Human-Centred Mindset: `blue`
+  - Ethics of AI: `purple`
+  - AI Techniques & Applications: `emerald`
+  - AI System Design: `orange`
 
 ### 10.2 Multi-User Indicators
 
