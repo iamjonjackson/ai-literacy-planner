@@ -26,7 +26,7 @@ function getAppOrigin(): string {
 }
 
 // Helper to create styled cell for coloring
-function styledCell(value: unknown, style: { fill: { fgColor: { rgb: string } }; font: { color: { rgb: string } } }): XLSX.CellObject {
+function styledCell(value: string | number | boolean | Date, style: { fill: { fgColor: { rgb: string } }; font: { color: { rgb: string } } }): XLSX.CellObject {
   return {
     t: typeof value === 'number' ? 'n' : 's',
     v: value,
@@ -51,7 +51,7 @@ function programmeOverviewRows(data: ExportData): XLSX.WorkSheet {
   const { programme, modules, learningOutcomes, assessments } = data;
   const newLearningOutcomes = learningOutcomes.filter((lo) => lo.competencyId !== null).length;
   const assessmentsBeingReviewed = assessments.filter(
-    (a) => a.priority !== null && a.priority !== ""
+    (a) => a.priority !== null
   ).length;
   const newLosOnly = learningOutcomes.filter((lo) => lo.competencyId !== null);
   const mapped = newLosOnly.filter((lo) => lo.moduleId).length;
