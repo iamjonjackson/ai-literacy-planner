@@ -47,7 +47,7 @@ const ragStyles = {
   Green: { fill: { fgColor: { rgb: "D1FAE5" } }, font: { color: { rgb: "065F46" } } },
 };
 
-function programmeOverviewRows(data: ExportData) {
+function programmeOverviewRows(data: ExportData): XLSX.WorkSheet {
   const { programme, modules, learningOutcomes, assessments } = data;
   const newLearningOutcomes = learningOutcomes.filter((lo) => lo.competencyId !== null).length;
   const assessmentsBeingReviewed = assessments.filter(
@@ -59,54 +59,34 @@ function programmeOverviewRows(data: ExportData) {
     newLosOnly.map((lo) => lo.competencyId),
   ).size;
 
-  // Two-column layout
-  const leftColumn = [
-    { "Programme name": programme.name },
-    { "Description": programme.description || "" },
-    { "Years": programme.years },
-    { "Modules": modules.length },
-    { "Learning Outcomes": newLosOnly.length },
-    { "Competencies covered": competenciesCovered },
+  // Two-column layout with no header row - just labels and values
+  const aoa: any[][] = [
+    ["Programme name", programme.name],
+    ["Description", programme.description || ""],
+    ["Years", programme.years],
+    ["Modules Under Review (Total)", modules.length],
+    ["AI Competencies covered", competenciesCovered],
+    ["New Learning Outcomes", newLosOnly?.length],
+    ["New LOs mapped to modules", mapped],
+    ["New LO mapping %", newLosOnly?.length ? Math.round((mapped / newLosOnly.length) * 100) + "%" : 0],
+    ["Assessments (Total)", assessments.length],
+    ["Assessments being reviewed", assessmentsBeingReviewed],
   ];
 
-  const rightColumn = [
-    { "LOs mapped": mapped },
-    { "LO mapping %": newLosOnly.length ? Math.round((mapped / newLosOnly.length) * 100) : 0 },
-    { "Total competencies": 12 },
-    { "Assessments": assessments.length },
-    { "New Learning Outcomes": newLearningOutcomes },
-    { "Assessments being reviewed": assessmentsBeingReviewed },
-  ];
-
-  // Merge into two-column rows
-  const rows: Record<string, unknown>[] = [];
-  const maxRows = Math.max(leftColumn.length, rightColumn.length);
-  
-  for (let i = 0; i < maxRows; i++) {
-    const row: Record<string, unknown> = {};
-    if (leftColumn[i]) {
-      Object.assign(row, leftColumn[i]);
-    }
-    if (rightColumn[i]) {
-      Object.assign(row, rightColumn[i]);
-    }
-    rows.push(row);
-  }
-  
-  return rows;
+  return XLSX.utils.aoa_to_sheet(aoa);
 }
 
 function coverageStatsRows(data: ExportData) {
   const { assessments } = data;
   const ragCounts: Record<string, number> = { Red: 0, Amber: 0, Green: 0, Unrated: 0 };
-  const priorityCounts: Record<string, number> = { High: 0, Medium: 0, Low: 0, "None set": 0 };
+  const priorityCounts: Record<string, number> = { High: 0, Medium: 0, Low: 0, "No action required": 0 };
   const totalAssessments = assessments.length;
 
   for (const a of assessments) {
     if (a.rag) ragCounts[a.rag]++;
     else ragCounts["Unrated"]++;
     if (a.priority) priorityCounts[a.priority]++;
-    else priorityCounts["None set"]++;
+    else priorityCounts["No action required"]++;
   }
 
   return [
@@ -114,13 +94,13 @@ function coverageStatsRows(data: ExportData) {
       Category: "AI and Assessment taxonomy",
       Label: status,
       Count: count,
-      Percentage: totalAssessments ? Math.round((count / totalAssessments) * 100) : 0,
+      Percentage: totalAssessments ? Math.round((count / totalAssessments) * 100) + "%" : 0,
     })),
     ...Object.entries(priorityCounts).map(([level, count]) => ({
       Category: "Priority Rating",
       Label: level,
       Count: count,
-      Percentage: totalAssessments ? Math.round((count / totalAssessments) * 100) : 0,
+      Percentage: totalAssessments ? Math.round((count / totalAssessments) * 100) + "%" : 0,
     })),
   ];
 }
@@ -129,12 +109,12 @@ function assessmentSummaryRows(data: ExportData): XLSX.WorkSheet {
   const moduleMap = new Map(data.modules.map((m) => [m.id, m]));
   
   // Sort by priority then RAG
-  const priorityOrder = { High: 0, Medium: 1, Low: 2, "": 3 };
+  const priorityOrder = { High: 0, Medium: 1, Low: 2, "No changes required": 3, "": 3 };
   const ragOrder = { Red: 0, Amber: 1, Green: 2, "": 3 };
   
   const sortedAssessments = [...data.assessments].sort((a, b) => {
-    const aPriority = a.priority ?? "";
-    const bPriority = b.priority ?? "";
+    const aPriority = a.priority ?? "No changes required";
+    const bPriority = b.priority ?? "No changes required";
     const priorityDiff = (priorityOrder as Record<string, number>)[aPriority] - (priorityOrder as Record<string, number>)[bPriority];
     if (priorityDiff !== 0) return priorityDiff;
     
@@ -145,8 +125,8 @@ function assessmentSummaryRows(data: ExportData): XLSX.WorkSheet {
   
   // Build array of arrays with styling
   const headers = [
-    "Assessment Code", "Assessment Title", "Weight", "Duration", 
-    "Priority", "AI and Assessment taxonomy", "Module", "Module Code", "Year"
+    "Module", "Module Code", "Assessment Code", "Assessment Title", "Weight", "Duration",
+    "Redesign Priority", "AI and Assessment taxonomy", "Year"
   ];
   
   const aoa: any[][] = [];
@@ -154,28 +134,28 @@ function assessmentSummaryRows(data: ExportData): XLSX.WorkSheet {
   
   sortedAssessments.forEach((a) => {
     const mod = moduleMap.get(a.moduleId);
+    const priorityValue = a.priority || "No changes required";
+    
     const rowData = [
+      mod?.name || "",
+      mod?.code || "",
       a.assessmentCode || "",
       a.title,
       a.weight || "",
       a.duration || "",
-      a.priority || "",
+      priorityValue,
       a.rag || "",
-      mod?.name || "",
-      mod?.code || "",
       mod?.year ?? "",
     ];
     
     const styledRow = rowData.map((value, colIdx) => {
       const cell: XLSX.CellObject = { t: typeof value === 'number' ? 'n' : 's', v: value };
       
-      // Priority column (index 4)
-      if (colIdx === 4 && value && (priorityStyles as Record<string, any>)[value]) {
+      if (colIdx === 6 && value && (priorityStyles as Record<string, any>)[value]) {
         cell.s = (priorityStyles as Record<string, any>)[value];
       }
       
-      // RAG column (index 5)
-      if (colIdx === 5 && value && (ragStyles as Record<string, any>)[value]) {
+      if (colIdx === 7 && value && (ragStyles as Record<string, any>)[value]) {
         cell.s = (ragStyles as Record<string, any>)[value];
       }
       
@@ -195,28 +175,34 @@ function assessmentSummaryRows(data: ExportData): XLSX.WorkSheet {
   return ws;
 }
 
-function allLosRows(data: ExportData) {
+function allLosRows(data: ExportData): XLSX.WorkSheet {
   const moduleMap = new Map(data.modules.map((m) => [m.id, m]));
-  return data.learningOutcomes.map((lo) => {
+  const rows = data.learningOutcomes.map((lo) => {
     const comp = frameworkCompetencies.find((c) => c.id === lo.competencyId);
     const mod = lo.moduleId ? moduleMap.get(lo.moduleId) : undefined;
     return {
-      "LO Text": lo.text,
-      "Competency ID": comp?.id || "",
-      "Competency Title": comp?.title || "",
-      "Imported Category": lo.category || "",
-      "Module": mod?.name || "Unmapped",
       "Module Code": mod?.code || "",
+      "Module": mod?.name || "Unmapped",
       "Year": mod?.year ?? "",
+      "LO Text": lo.text,
+      "AI Competency ID": comp?.id || "",
+      "AI Competency Title": comp?.title || "",
+      "Category": lo.category || "",
     };
   });
+  
+  const ws = makeSheet(rows);
+  if (ws["!ref"]) {
+    ws["!autofilter"] = { ref: ws["!ref"] };
+  }
+  return ws;
 }
 
-function moduleListRows(data: ExportData) {
+function moduleListRows(data: ExportData): XLSX.WorkSheet {
   const { modules, learningOutcomes, assessments } = data;
   const origin = getAppOrigin();
   
-  return [...modules]
+  const rows = [...modules]
     .sort((a, b) => a.year - b.year || a.order - b.order)
     .map((m) => {
       // Make URL a full clickable link
@@ -224,6 +210,14 @@ function moduleListRows(data: ExportData) {
       if (url && !url.startsWith("http")) {
         url = origin ? `${origin}${url.startsWith("/") ? "" : "/"}${url}` : url;
       }
+      
+      const moduleLos = learningOutcomes.filter((lo) => lo.moduleId === m.id);
+      const moduleAssessments = assessments.filter((a) => a.moduleId === m.id);
+      
+      const newLosCount = moduleLos.filter((lo) => lo.competencyId !== null && lo.status !== "to_delete").length;
+      const deletedLosCount = moduleLos.filter((lo) => lo.status === "to_delete").length;
+      const deletedAssessmentsCount = moduleAssessments.filter((a) => a.status === "to_delete").length;
+      const hasChanges = newLosCount > 0 || deletedLosCount > 0 || deletedAssessmentsCount > 0;
       
       return {
         Year: m.year,
@@ -233,18 +227,28 @@ function moduleListRows(data: ExportData) {
         Compulsory: m.isCompulsory ? "Yes" : "No",
         Scheme: m.scheme || "",
         Organiser: m.organiser || "",
-        "LO Count": learningOutcomes.filter((lo) => lo.moduleId === m.id).length,
-        "Assessment Count": assessments.filter((a) => a.moduleId === m.id).length,
+        "LO Count": moduleLos.length,
+        "New LOs": newLosCount,
+        "Deleted LOs": deletedLosCount,
+        "Deleted Assessments": deletedAssessmentsCount,
+        "Has Changes": hasChanges ? "Yes" : "No",
+        "Assessment Count": moduleAssessments.length,
         URL: url,
       };
     });
+  
+  const ws = makeSheet(rows);
+  if (ws["!ref"]) {
+    ws["!autofilter"] = { ref: ws["!ref"] };
+  }
+  return ws;
 }
 
-function coverageMatrixRows(data: ExportData) {
+function coverageMatrixRows(data: ExportData): XLSX.WorkSheet {
   const { modules, learningOutcomes } = data;
   const sortedModules = [...modules].sort((a, b) => a.year - b.year || a.order - b.order);
 
-  return frameworkCompetencies.map((comp) => {
+  const rows = frameworkCompetencies.map((comp) => {
     const row: Record<string, unknown> = {
       "Competency ID": comp.id,
       "Competency Title": comp.title,
@@ -258,17 +262,82 @@ function coverageMatrixRows(data: ExportData) {
     }
     return row;
   });
+
+  const ws = makeSheet(rows);
+  
+  // Add footer with UNESCO link
+  if (ws["!ref"]) {
+    const ref = XLSX.utils.decode_range(ws["!ref"]);
+    const footerRow = ref.e.r + 1;
+    ws[`A${footerRow}`] = { t: "s", v: `For more information on UNESCO AI competencies see ${getAppOrigin()}/explore` };
+    if (!ws["!merges"]) ws["!merges"] = [];
+    ws["!merges"].push({ s: { r: footerRow - 1, c: 0 }, e: { r: footerRow - 1, c: ref.e.c } });
+  }
+  
+  return ws;
+}
+
+function programmeLosRows(data: ExportData): XLSX.WorkSheet {
+  const { learningOutcomes } = data;
+  
+  // Programme-level LOs (not mapped to modules)
+  const programmeLos = learningOutcomes.filter((lo) => lo.moduleId === null);
+  
+  // Categorize them
+  const newLos = programmeLos.filter((lo) => lo.competencyId !== null && lo.status !== "to_delete");
+  const removedLos = programmeLos.filter((lo) => lo.status === "to_delete");
+  const existingLos = programmeLos.filter((lo) => lo.competencyId === null && lo.status !== "to_delete");
+  
+  const rows = [
+    ...newLos.map((lo) => {
+      const comp = frameworkCompetencies.find((c) => c.id === lo.competencyId);
+      return {
+        "LO Number": lo.loNumber || "",
+        "LO Text": lo.text,
+        "AI Competency ID": comp?.id || "",
+        "AI Competency": comp?.title || "",
+        Category: lo.category || "",
+        Status: "AI Mapped",
+      };
+    }),
+    ...removedLos.map((lo) => {
+      const comp = frameworkCompetencies.find((c) => c.id === lo.competencyId);
+      return {
+        "LO Number": lo.loNumber || "",
+        "LO Text": lo.text,
+        "AI Competency ID": comp?.id || "",
+        "AI Competency": comp?.title || "",
+        Category: lo.category || "",
+        Status: "Removed",
+      };
+    }),
+    ...existingLos.map((lo) => ({
+      "LO Number": lo.loNumber || "",
+      "LO Text": lo.text,
+      "AI Competency ID": "",
+      "AI Competency": "",
+      Category: lo.category || "",
+      Status: "",
+    })),
+  ];
+  
+  const ws = makeSheet(rows);
+  if (ws["!ref"]) {
+    ws["!autofilter"] = { ref: ws["!ref"] };
+  }
+  return ws;
 }
 
 export function downloadFullDetailXlsx(data: ExportData) {
   const wb = XLSX.utils.book_new();
 
-  XLSX.utils.book_append_sheet(wb, makeSheet(programmeOverviewRows(data)), "Programme Info");
-  XLSX.utils.book_append_sheet(wb, makeSheet(allLosRows(data)), "All LOs");
-  XLSX.utils.book_append_sheet(wb, makeSheet(moduleListRows(data)), "Module List");
+  XLSX.utils.book_append_sheet(wb, programmeOverviewRows(data), "Programme Info");
+  XLSX.utils.book_append_sheet(wb, makeSheet(coverageStatsRows(data)), "Stats");
+  XLSX.utils.book_append_sheet(wb, coverageMatrixRows(data), "AI coverage matrix");
+  XLSX.utils.book_append_sheet(wb, programmeLosRows(data), "Programme LOs");
+  XLSX.utils.book_append_sheet(wb, allLosRows(data), "Module LOs");
+  XLSX.utils.book_append_sheet(wb, moduleListRows(data), "Module List");
   XLSX.utils.book_append_sheet(wb, assessmentSummaryRows(data), "Assessments");
-  XLSX.utils.book_append_sheet(wb, makeSheet(coverageStatsRows(data)), "Coverage Stats");
-  XLSX.utils.book_append_sheet(wb, makeSheet(coverageMatrixRows(data)), "Coverage Matrix");
 
   const datePart = new Date().toISOString().slice(0, 10);
   XLSX.writeFile(wb, `${safeFilename(data.programme.name)}-full-detail-${datePart}.xlsx`);

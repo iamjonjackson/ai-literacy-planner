@@ -61,11 +61,11 @@ The `downloadFullDetailXlsx` function in `/lib/xlsx-export.ts` exports 7 tabs:
 
 1. **Programme Info** - Programme overview with counts in two-column layout (excludes old LOs from counts)
 2. **Stats** - Coverage statistics with counts and percentages
-3. **AI coverage matrix** - Competency coverage across modules with UNESCO URL
-4. **All LOs** - All learning outcomes with competency mapping
-5. **Module List** - Modules with counts and full clickable URLs
-6. **Assessments** - Sorted by priority then RAG, with autofilter and color coding
-7. **Coverage Matrix** - Competency coverage matrix
+3. **AI coverage matrix** - Competency coverage across modules with UNESCO URL link
+4. **Programme LOs** - Programme-level LOs showing new, removed, and existing
+5. **All LOs** - All learning outcomes with competency mapping
+6. **Module List** - Modules with counts, change indicators (New LOs, Deleted LOs, Deleted Assessments), and full clickable URLs
+7. **Assessments** - Sorted by priority then RAG, with autofilter and color coding
 
 ### Colour Coding (Assessments Tab)
 
