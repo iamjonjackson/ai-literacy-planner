@@ -134,7 +134,9 @@ function assessmentSummaryRows(data: ExportData): XLSX.WorkSheet {
   
   sortedAssessments.forEach((a) => {
     const mod = moduleMap.get(a.moduleId);
-    const priorityValue = a.priority || "No changes required";
+    const isDeleted = a.status === "to_delete";
+    const priorityValue = isDeleted ? "To be removed" : (a.priority || "No changes required");
+    const yearValue = isDeleted ? "" : (mod?.year ?? "");
     
     const rowData = [
       mod?.name || "",
@@ -145,13 +147,13 @@ function assessmentSummaryRows(data: ExportData): XLSX.WorkSheet {
       a.duration || "",
       priorityValue,
       a.rag || "",
-      mod?.year ?? "",
+      yearValue,
     ];
     
     const styledRow = rowData.map((value, colIdx) => {
       const cell: XLSX.CellObject = { t: typeof value === 'number' ? 'n' : 's', v: value };
       
-      if (colIdx === 6 && value && (priorityStyles as Record<string, any>)[value]) {
+      if (colIdx === 6 && value && !isDeleted && (priorityStyles as Record<string, any>)[value]) {
         cell.s = (priorityStyles as Record<string, any>)[value];
       }
       
@@ -197,6 +199,8 @@ function allLosRows(data: ExportData): XLSX.WorkSheet {
     .map((lo) => {
       const comp = frameworkCompetencies.find((c) => c.id === lo.competencyId);
       const mod = lo.moduleId ? moduleMap.get(lo.moduleId) : undefined;
+      const isDeleted = lo.status === "to_delete";
+      
       return {
         "Module Code": mod?.code || "",
         "Module": mod?.name || "Unmapped",
@@ -204,7 +208,8 @@ function allLosRows(data: ExportData): XLSX.WorkSheet {
         "LO Text": lo.text,
         "AI Competency ID": comp?.id || "",
         "AI Competency Title": comp?.title || "",
-        "Category": lo.category || "",
+        "Category": isDeleted ? "" : (lo.category || ""),
+        "Action": isDeleted ? "To be removed" : "",
       };
     });
   
@@ -324,8 +329,8 @@ function programmeLosRows(data: ExportData): XLSX.WorkSheet {
         "LO Text": lo.text,
         "AI Competency ID": comp?.id || "",
         "AI Competency": comp?.title || "",
-        Category: lo.category || "",
-        Status: "Removed",
+        Category: "",
+        Status: "To be removed",
       };
     }),
     ...existingLos.map((lo) => ({
