@@ -1,6 +1,34 @@
 import Papa from "papaparse";
 import type { CsvModuleImportRow, CsvProgrammeLearningOutcomeImportRow } from "@/lib/app-data";
 
+/**
+ * Fixes common character encoding issues from CSV files.
+ * Handles Windows-1252 characters that are often misread as UTF-8.
+ * Replaces the Unicode replacement character and fixes common smart quotes.
+ */
+function fixEncoding(text: string): string {
+  if (!text) return text;
+
+  return text
+    // Replace Unicode replacement character (U+FFFD) which appears when invalid bytes are read as UTF-8
+    .replace(/\ufffd/g, "'")
+    // Fix common Windows-1252 to UTF-8 mojibake for smart quotes and apostrophes
+    .replace(/\u0092/g, "'") // Windows-1252 right single quote (0x92) -> apostrophe
+    .replace(/\u2019/g, "'") // Proper right single quote -> apostrophe
+    .replace(/\u2018/g, "'") // Proper left single quote -> apostrophe
+    .replace(/\u201c/g, '"') // Left double quote -> straight double quote
+    .replace(/\u201d/g, '"') // Right double quote -> straight double quote
+    .replace(/\u2026/g, "..."); // Ellipsis -> three dots
+}
+
+/**
+ * Trims and fixes encoding for a string value.
+ */
+function cleanText(text: string | undefined): string {
+  if (!text) return "";
+  return fixEncoding(text.trim());
+}
+
 export type CsvPreviewRow = {
   code: string;
   name: string;
@@ -52,7 +80,11 @@ function parseLearningOutcomes(
       const [category, loNumber, ...rest] = parts;
       const text = rest.join("|").trim();
       if (!text) return [];
-      return [{ category: category ?? "", loNumber: loNumber ?? "", text }];
+      return [{
+        category: fixEncoding(category ?? ""),
+        loNumber: fixEncoding(loNumber ?? ""),
+        text: fixEncoding(text),
+      }];
     });
 }
 
@@ -72,10 +104,10 @@ function parseAssessments(
       if (!title) return [];
       return [
         {
-          assessmentCode: assessmentCode ?? "",
-          title,
-          weight: weight ?? "",
-          duration: duration?.trim() ?? "",
+          assessmentCode: fixEncoding(assessmentCode ?? ""),
+          title: fixEncoding(title),
+          weight: fixEncoding(weight ?? ""),
+          duration: fixEncoding(duration?.trim() ?? ""),
         },
       ];
     });
@@ -96,9 +128,9 @@ export async function parseCsvFile(
         const importRows: CsvModuleImportRow[] = [];
 
         for (const row of results.data) {
-          const rawName = row["module_name"]?.trim() ?? "";
-          const rawLevel = row["level"]?.trim() ?? "";
-          const rawCode = row["module_code"]?.trim() ?? "";
+          const rawName = cleanText(row["module_name"]);
+          const rawLevel = cleanText(row["level"]);
+          const rawCode = cleanText(row["module_code"]);
 
           if (!rawName) {
             skipped.push({ rawName: rawCode || "(no name)", reason: "Missing module_name", skipped: true });
@@ -116,13 +148,13 @@ export async function parseCsvFile(
           }
 
           const year = level - 3;
-          const compulsoryRaw = row["compulsory"]?.trim().toLowerCase() ?? "";
+          const compulsoryRaw = cleanText(row["compulsory"]).toLowerCase();
           const isCompulsory = compulsoryRaw === "yes";
-          const credits = row["credits"]?.trim() ?? "";
-          const scheme = row["scheme"]?.trim() ?? "";
-          const organiser = row["organiser"]?.trim() ?? "";
-          const aims = row["aims"]?.trim() ?? "";
-          const url = row["url"]?.trim() ?? "";
+          const credits = cleanText(row["credits"]);
+          const scheme = cleanText(row["scheme"]);
+          const organiser = cleanText(row["organiser"]);
+          const aims = cleanText(row["aims"]);
+          const url = cleanText(row["url"]);
 
           const learningOutcomes = parseLearningOutcomes(row["learning_outcomes"] ?? "");
           const assessments = parseAssessments(row["assessments"] ?? "");
@@ -179,9 +211,9 @@ export async function parseProgrammeLearningOutcomesCsvFile(
         const importRows: CsvProgrammeLearningOutcomeImportRow[] = [];
 
         for (const row of results.data) {
-          const loNumber = row["number"]?.trim() ?? "";
-          const category = row["type"]?.trim() ?? "";
-          const text = row["lo"]?.trim() ?? "";
+          const loNumber = cleanText(row["number"]);
+          const category = cleanText(row["type"]);
+          const text = cleanText(row["lo"]);
           const rawName = loNumber || category || text || "(blank row)";
 
           if (!loNumber) {
