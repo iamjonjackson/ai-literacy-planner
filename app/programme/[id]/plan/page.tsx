@@ -499,6 +499,12 @@ function PlanPageContent() {
 
                       <div className="min-w-0 flex-2 space-y-2 gap-2">
                         <span className="inline-block text-sm leading-6 text-slate-700 mr-2">
+                          {learningOutcome.category ? (
+                            <span className="inline-block rounded-full bg-slate-200 px-2 py-1 text-xs font-semibold text-slate-700 mr-2">
+                              {learningOutcome.category}
+                            </span>
+                          ) : null}
+
                           {learningOutcome.text}
                         </span>
                         {isMarkedForDeletion ? (

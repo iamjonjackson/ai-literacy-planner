@@ -416,7 +416,7 @@ function AssessPageContent() {
                                     key={learningOutcome.id}
                                     className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm"
                                   >
-                                    ({learningOutcome.category}) {learningOutcome.text}
+                                    <span className="inline-block rounded-full bg-slate-200 px-2 py-1 text-xs font-semibold text-slate-700 mr-2">{learningOutcome.category}</span> {learningOutcome.text}
                                   </article>
                                 );
                             })}

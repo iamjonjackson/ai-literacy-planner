@@ -146,7 +146,7 @@ function MapPageContent() {
                                       }`}
                                     >
                                       {/* {competency?.id ?? "Imported"}:  */}
-                                      {learningOutcome.category ? `(${learningOutcome.category}) ` : ""}
+                                      {learningOutcome.category ? <span className="inline-block rounded-full bg-slate-200 px-2 py-1 text-xs font-semibold text-slate-700 mr-2">{learningOutcome.category}</span> : ""}
                                       {/* {learningOutcome.loNumber ? `${learningOutcome.loNumber}. ` : ""} */}
                                       {learningOutcome.text}
                                       {!isViewer ? (
@@ -311,7 +311,7 @@ function MapPageContent() {
                   {/* <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
                     {competency?.id ?? "Imported LO"}
                   </p> */}
-                  <p className="mt-1 text-sm text-slate-700">({learningOutcome.category}) {learningOutcome.text}</p>
+                  <p className="mt-1 text-sm text-slate-700"><span className="inline-block rounded-full bg-slate-200 px-2 py-1 text-xs font-semibold text-slate-700 mr-2">{learningOutcome.category}</span> {learningOutcome.text}</p>
                   <div className="mt-3 flex gap-2">
                     <select
                       className="flex-1 rounded-lg border border-slate-200 px-2 py-1 text-xs"
