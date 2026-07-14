@@ -208,6 +208,11 @@ function AssessPageContent() {
                         ) : (
                           <h2 className="text-xl font-semibold text-slate-900">{module.code} {module.name}</h2>
                         )}
+                        <span className={`inline-block ml-2 rounded-full px-2 py-1 text-xs font-semibold ${
+                          module.isCompulsory ? "bg-blue-100 text-blue-700" : "bg-purple-100 text-purple-700"
+                        }`}>
+                          {module.isCompulsory ? "Compulsory" : "Elective"}
+                        </span>
                       </div>
                       <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
                         {moduleAssessments.length} assessments

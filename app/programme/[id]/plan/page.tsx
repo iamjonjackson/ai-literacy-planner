@@ -784,7 +784,12 @@ function PlanPageContent() {
 {/* 
                 <h4 className="font-semibold text-slate-900">{module.name}</h4>
                 <p className="mt-1 text-xs text-slate-500">{module.code || "No code"}</p> */}
-                <p className="mt-1 text-xs text-slate-500">Credits: {module.credits || "-"}</p>
+                <p className="mt-1 text-xs text-slate-500">Credits: {module.credits || "-"} 
+                <span className={`inline-block mt-1 ml-2 rounded-full px-2 py-1 text-xs font-semibold ${
+                  module.isCompulsory ? "bg-blue-100 text-blue-700" : "bg-purple-100 text-purple-700"
+                }`}>
+                  {module.isCompulsory ? "Compulsory" : "Elective"}
+                </span> </p>
                 {module.description ? (
                   <p className="mt-1 text-xs text-slate-500 line-clamp-2">{module.description}</p>
                 ) : null}
