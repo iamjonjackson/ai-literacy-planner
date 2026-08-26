@@ -216,17 +216,18 @@ function addPerModuleAssessments(doc: jsPDF, startY: number, data: ExportData): 
         [
           {
             content: `${mod.name}${mod.code ? ` (${mod.code})` : ""} — Year ${mod.year}`,
-            colSpan: 5,
+            colSpan: 7,
             styles: { fillColor: [71, 85, 105] as [number,number,number], textColor: [255, 255, 255] as [number,number,number] },
           },
         ],
-        ["Code", "Title", "Weight", "Duration", "Priority", "RAG"],
+        ["Code", "Title", "Weight", "Duration", "Notes", "Priority", "RAG"],
       ],
       body: modAssessments.map((a) => [
         a.assessmentCode || "—",
         a.title,
         a.weight || "—",
         a.duration || "—",
+        a.description || "—",
         a.priority ?? "—",
         a.rag ?? "—",
       ]),

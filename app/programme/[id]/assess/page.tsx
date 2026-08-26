@@ -2,7 +2,7 @@
 
 import { Suspense, useMemo, useState } from "react";
 import { useParams, useSearchParams } from "next/navigation";
-import { useAppData, type PriorityRating, type RagStatus } from "@/lib/app-data";
+import { useAppData, type Assessment, type PriorityRating, type RagStatus } from "@/lib/app-data";
 import { Modal, ConfirmModal } from "@/components/modal";
 
 const priorities: PriorityRating[] = ["High", "Medium", "Low"];
@@ -48,10 +48,31 @@ function AssessPageContent() {
   const [deleteAssessmentState, setDeleteAssessmentState] = useState<DeleteAssessmentState>({ open: false, id: "" });
 
   const modules = state.modules.filter((module) => module.programmeId === programmeId);
+  const sortedModules = useMemo(
+    () =>
+      [...modules].sort(
+        (a, b) =>
+          a.year - b.year ||
+          a.order - b.order ||
+          (a.code ?? "").localeCompare(b.code ?? "", undefined, { numeric: true, sensitivity: "base" }) ||
+          a.name.localeCompare(b.name, undefined, { sensitivity: "base" }),
+      ),
+    [modules],
+  );
+  const compareAssessments = (a: Assessment, b: Assessment) => {
+    const codeDiff = (a.assessmentCode ?? "").localeCompare(b.assessmentCode ?? "", undefined, {
+      numeric: true,
+      sensitivity: "base",
+    });
+    if (codeDiff !== 0) return codeDiff;
+    const titleDiff = a.title.localeCompare(b.title, undefined, { sensitivity: "base" });
+    if (titleDiff !== 0) return titleDiff;
+    return a.id.localeCompare(b.id);
+  };
   const modulesByYear = useMemo(() => {
     const grouped: Record<string, typeof modules> = {};
 
-    modules.forEach((module) => {
+    sortedModules.forEach((module) => {
       const yearValue = (module as { year?: string | number | null }).year;
       const year = yearValue !== undefined && yearValue !== null && `${yearValue}`.trim() !== ""
         ? `Year ${yearValue}`
@@ -64,7 +85,7 @@ function AssessPageContent() {
     });
 
     return Object.entries(grouped).sort(([a], [b]) => a.localeCompare(b, undefined, { numeric: true }));
-  }, [modules]);
+  }, [sortedModules]);
   const programme = state.programmes.find((record) => record.id === programmeId);
   const isViewer = programme?.role === "viewer";
   const learningOutcomes = state.learningOutcomes.filter((learningOutcome) => learningOutcome.programmeId === programmeId);
@@ -188,7 +209,9 @@ function AssessPageContent() {
             <div key={year} className="space-y-4">
               <h2 className="text-lg font-semibold text-slate-900">{year}</h2>
               {yearModules.map((module) => {
-                const moduleAssessments = assessments.filter((assessment) => assessment.moduleId === module.id);
+                const moduleAssessments = assessments
+                  .filter((assessment) => assessment.moduleId === module.id)
+                  .sort(compareAssessments);
                 const draft = drafts[module.id] ?? { title: "", rag: "Amber" };
                 const isAddFormOpen = openAddFormForModuleId === module.id;
 
@@ -281,7 +304,7 @@ function AssessPageContent() {
                                 
                               </div>
                             </div>
-                            <p className="mt-2 text-sm text-slate-700">{assessment.description || "No description"}</p>
+                            <p className="mt-2 text-sm text-slate-700">{assessment.description || "No notes"}</p>
                             {!isViewer ? (
                               <div className="mt-3 flex flex-wrap gap-2">
                                 {assessment.status != "to_delete" ? (
@@ -474,7 +497,7 @@ function AssessPageContent() {
             />
           </label>
           <label className="block text-sm font-medium text-slate-700">
-            Description
+            Notes
             <textarea
               className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm"
               rows={3}

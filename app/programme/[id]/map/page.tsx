@@ -3,6 +3,8 @@
 import { Suspense, useState } from "react";
 import { useParams, useSearchParams } from "next/navigation";
 import { useAppData } from "@/lib/app-data";
+import { frameworkCompetencies } from "@/lib/framework";
+import { ConfirmModal } from "@/components/modal";
 
 const loCategories = ["Disciplinary Skills", "Academic Content", "Attributes"] as const;
 
@@ -10,9 +12,10 @@ function MapPageContent() {
   const params = useParams<{ id: string }>();
   const searchParams = useSearchParams();
   const programmeId = searchParams.get("programme") ?? params.id;
-  const { state, updateLearningOutcome, addLearningOutcome } = useAppData();
+  const { state, updateLearningOutcome, addLearningOutcome, deleteLearningOutcome } = useAppData();
   const [openAddFormForModuleId, setOpenAddFormForModuleId] = useState<string | null>(null);
   const [drafts, setDrafts] = useState<Record<string, { text: string; category: (typeof loCategories)[number] }>>({});
+  const [deleteLearningOutcomeId, setDeleteLearningOutcomeId] = useState<string | null>(null);
 
 
   const modules = state.modules
@@ -170,19 +173,37 @@ function MapPageContent() {
                                               >
                                                 Restore
                                               </button>
+                                              {!learningOutcome.competencyId ? (
+                                                <button
+                                                  type="button"
+                                                  className="rounded-full border border-red-200 px-3 py-1 text-xs font-semibold text-red-700"
+                                                  onClick={() => setDeleteLearningOutcomeId(learningOutcome.id)}
+                                                >
+                                                  Delete permanently
+                                                </button>
+                                              ) : null}
                                             </>
                                             // if does not have a mapped competency, allow mark for deletion
 
                                           ) : learningOutcome.competencyId ? null : (
-                                            <button
-                                              type="button"
-                                              className="rounded-full border border-amber-200 px-3 py-1 text-xs font-semibold text-amber-700"
-                                              onClick={() =>
-                                                updateLearningOutcome(learningOutcome.id, { status: "to_delete" })
-                                              }
-                                            >
-                                              Mark for deletion
-                                            </button>
+                                            <>
+                                              <button
+                                                type="button"
+                                                className="rounded-full border border-amber-200 px-3 py-1 text-xs font-semibold text-amber-700"
+                                                onClick={() =>
+                                                  updateLearningOutcome(learningOutcome.id, { status: "to_delete" })
+                                                }
+                                              >
+                                                Mark for deletion
+                                              </button>
+                                              <button
+                                                type="button"
+                                                className="rounded-full border border-red-200 px-3 py-1 text-xs font-semibold text-red-700"
+                                                onClick={() => setDeleteLearningOutcomeId(learningOutcome.id)}
+                                              >
+                                                Delete permanently
+                                              </button>
+                                            </>
                                           )}
                                         </div>
                                       ) : (
@@ -304,7 +325,13 @@ function MapPageContent() {
             <p className="text-sm text-slate-500">No learning outcomes yet.</p>
           ) : (
             [...newLearningOutcomes].sort(compareLearningOutcomes).map((learningOutcome) => {
-              // const competency = frameworkCompetencies.find((record) => record.id === learningOutcome.competencyId);
+              const competency = frameworkCompetencies.find((record) => record.id === learningOutcome.competencyId);
+              const competencyNarrative =
+                competency?.levels.create ??
+                competency?.levels.apply ??
+                competency?.levels.understand ??
+                competency?.narrative ??
+                "";
 
               return (
                 <article
@@ -313,10 +340,22 @@ function MapPageContent() {
                     learningOutcome.moduleId ? "border-green-500 bg-green-50" : "border-slate-200"
                   }`}
                 >
-                  {/* <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                    {competency?.id ?? "Imported LO"}
-                  </p> */}
-                  <p className="mt-1 text-sm text-slate-700"><span className="inline-block rounded-full bg-slate-200 px-2 py-1 text-xs font-semibold text-slate-700 mr-2">{learningOutcome.category}</span> {learningOutcome.text}</p>
+                  <p className="mt-1 text-sm text-slate-700">
+                    {learningOutcome.category ? (
+                      <span className="inline-block rounded-full bg-slate-200 px-2 py-1 text-xs font-semibold text-slate-700 mr-2">
+                        {learningOutcome.category}
+                      </span>
+                    ) : null}
+                    {competency ? (
+                      <span
+                        className="inline-block rounded-full bg-blue-100 px-2 py-1 text-xs font-semibold text-blue-700 mr-2"
+                        title={`${competency.id} ${competency.title}${competencyNarrative ? ` — ${competencyNarrative}` : ""}`}
+                      >
+                        {competency.id}
+                      </span>
+                    ) : null}
+                    {learningOutcome.text}
+                  </p>
                   <div className="mt-3 flex gap-2">
                     <select
                       className="flex-1 rounded-lg border border-slate-200 px-2 py-1 text-xs"
@@ -351,6 +390,18 @@ function MapPageContent() {
           )}
         </div>
       </aside>
+      <ConfirmModal
+        open={deleteLearningOutcomeId !== null}
+        onClose={() => setDeleteLearningOutcomeId(null)}
+        onConfirm={() => {
+          if (deleteLearningOutcomeId) {
+            deleteLearningOutcome(deleteLearningOutcomeId);
+          }
+        }}
+        title="Delete learning outcome"
+        message="Are you sure?"
+        confirmLabel="Delete"
+      />
     </div>
   );
 }

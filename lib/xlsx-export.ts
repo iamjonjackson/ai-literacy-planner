@@ -126,7 +126,7 @@ function assessmentSummaryRows(data: ExportData): XLSX.WorkSheet {
   // Build array of arrays with styling
   const headers = [
     "Module", "Module Code", "Assessment Code", "Assessment Title", "Weight", "Duration",
-    "Redesign Priority", "AI and Assessment taxonomy", "Year"
+    "Notes", "Redesign Priority", "AI and Assessment taxonomy", "Year"
   ];
   
   const aoa: any[][] = [];
@@ -145,6 +145,7 @@ function assessmentSummaryRows(data: ExportData): XLSX.WorkSheet {
       a.title,
       a.weight || "",
       a.duration || "",
+      a.description || "",
       priorityValue,
       a.rag || "",
       yearValue,
@@ -153,11 +154,11 @@ function assessmentSummaryRows(data: ExportData): XLSX.WorkSheet {
     const styledRow = rowData.map((value, colIdx) => {
       const cell: XLSX.CellObject = { t: typeof value === 'number' ? 'n' : 's', v: value };
       
-      if (colIdx === 6 && value && !isDeleted && (priorityStyles as Record<string, any>)[value]) {
+      if (colIdx === 7 && value && !isDeleted && (priorityStyles as Record<string, any>)[value]) {
         cell.s = (priorityStyles as Record<string, any>)[value];
       }
       
-      if (colIdx === 7 && value && (ragStyles as Record<string, any>)[value]) {
+      if (colIdx === 8 && value && (ragStyles as Record<string, any>)[value]) {
         cell.s = (ragStyles as Record<string, any>)[value];
       }
       
@@ -290,7 +291,7 @@ function coverageMatrixRows(data: ExportData): XLSX.WorkSheet {
   // Add footer with UNESCO link
   if (ws["!ref"]) {
     const ref = XLSX.utils.decode_range(ws["!ref"]);
-    const footerRow = ref.e.r + 1;
+    const footerRow = ref.e.r + 2;
     ws[`A${footerRow}`] = { t: "s", v: `For more information on UNESCO AI competencies see ${getAppOrigin()}/explore` };
     if (!ws["!merges"]) ws["!merges"] = [];
     ws["!merges"].push({ s: { r: footerRow - 1, c: 0 }, e: { r: footerRow - 1, c: ref.e.c } });
