@@ -64,6 +64,7 @@ export type IdbAssessment = {
   duration: string;
   priority: "Low" | "Medium" | "High" | null;
   rag: "Red" | "Amber" | "Green" | null;
+  ragPlanned: "Red" | "Amber" | "Green" | null;
   status?: "to_delete";
   learningOutcomeIds: string[];
   updatedAt: string;
@@ -97,7 +98,7 @@ interface PlannerSchema extends DBSchema {
 // ─── DB singleton ─────────────────────────────────────────────────────────────
 
 const DB_NAME = "ai-literacy-planner";
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 
 let dbPromise: Promise<IDBPDatabase<PlannerSchema>> | null = null;
 

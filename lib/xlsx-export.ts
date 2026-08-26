@@ -79,19 +79,29 @@ function programmeOverviewRows(data: ExportData): XLSX.WorkSheet {
 function coverageStatsRows(data: ExportData) {
   const { assessments } = data;
   const ragCounts: Record<string, number> = { Red: 0, Amber: 0, Green: 0, Unrated: 0 };
+  const ragPlannedCounts: Record<string, number> = { Red: 0, Amber: 0, Green: 0, Unrated: 0 };
+  const totalAssessments = assessments.length;
   const priorityCounts: Record<string, number> = { High: 0, Medium: 0, Low: 0, "No action required": 0 };
   const totalAssessments = assessments.length;
 
   for (const a of assessments) {
     if (a.rag) ragCounts[a.rag]++;
     else ragCounts["Unrated"]++;
+    if (a.ragPlanned) ragPlannedCounts[a.ragPlanned]++;
+    else ragPlannedCounts["Unrated"]++;
     if (a.priority) priorityCounts[a.priority]++;
     else priorityCounts["No action required"]++;
   }
 
   return [
     ...Object.entries(ragCounts).map(([status, count]) => ({
-      Category: "AI and Assessment taxonomy",
+      Category: "AI and Assessment taxonomy (Current)",
+      Label: status,
+      Count: count,
+      Percentage: totalAssessments ? Math.round((count / totalAssessments) * 100) + "%" : 0,
+    })),
+    ...Object.entries(ragPlannedCounts).map(([status, count]) => ({
+      Category: "AI and Assessment taxonomy (Planned)",
       Label: status,
       Count: count,
       Percentage: totalAssessments ? Math.round((count / totalAssessments) * 100) + "%" : 0,
@@ -126,7 +136,7 @@ function assessmentSummaryRows(data: ExportData): XLSX.WorkSheet {
   // Build array of arrays with styling
   const headers = [
     "Module", "Module Code", "Assessment Code", "Assessment Title", "Weight", "Duration",
-    "Redesign Priority", "AI and Assessment taxonomy", "Notes", "Year"
+    "Redesign Priority", "AI and Assessment taxonomy (Current)", "AI and Assessment taxonomy (Planned)", "Notes", "Year"
   ];
   
   const aoa: any[][] = [];
@@ -147,6 +157,7 @@ function assessmentSummaryRows(data: ExportData): XLSX.WorkSheet {
       a.duration || "",
       priorityValue,
       a.rag || "",
+      a.ragPlanned || "",
       a.description || "",
       yearValue,
     ];
@@ -159,6 +170,9 @@ function assessmentSummaryRows(data: ExportData): XLSX.WorkSheet {
       }
       
       if (colIdx === 7 && value && (ragStyles as Record<string, any>)[value]) {
+        cell.s = (ragStyles as Record<string, any>)[value];
+      }
+      if (colIdx === 8 && value && (ragStyles as Record<string, any>)[value]) {
         cell.s = (ragStyles as Record<string, any>)[value];
       }
       

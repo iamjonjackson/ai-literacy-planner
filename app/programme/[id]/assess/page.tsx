@@ -18,6 +18,7 @@ type EditAssessmentState = {
   duration: string;
   priority: PriorityRating | "";
   rag: RagStatus;
+  ragPlanned: RagStatus;
 };
 
 const emptyEdit: EditAssessmentState = {
@@ -30,6 +31,7 @@ const emptyEdit: EditAssessmentState = {
   duration: "",
   priority: "",
   rag: "Amber",
+  ragPlanned: "",
 };
 
 type DeleteAssessmentState = {
@@ -42,7 +44,7 @@ function AssessPageContent() {
   const searchParams = useSearchParams();
   const programmeId = searchParams.get("programme") ?? params.id;
   const { state, addAssessment, updateAssessment, deleteAssessment } = useAppData();
-  const [drafts, setDrafts] = useState<Record<string, { title: string; rag: RagStatus }>>({});
+  const [drafts, setDrafts] = useState<Record<string, { title: string; rag: RagStatus; ragPlanned: RagStatus }>>({});
   const [openAddFormForModuleId, setOpenAddFormForModuleId] = useState<string | null>(null);
   const [editState, setEditState] = useState<EditAssessmentState>(emptyEdit);
   const [deleteAssessmentState, setDeleteAssessmentState] = useState<DeleteAssessmentState>({ open: false, id: "" });
@@ -83,6 +85,12 @@ function AssessPageContent() {
       Amber: 0,
       Green: 0,
     };
+    const byRagPlanned: Record<RagStatus, number> = {
+      "": 0,
+      Red: 0,
+      Amber: 0,
+      Green: 0,
+    };
 
     activeAssessments.forEach((assessment) => {
       if (assessment.priority) {
@@ -91,18 +99,22 @@ function AssessPageContent() {
       if (assessment.rag) {
         byRag[assessment.rag] += 1;
       }
+      if (assessment.ragPlanned) {
+        byRagPlanned[assessment.ragPlanned] += 1;
+      }
     });
 
     return {
       total: activeAssessments.length,
       byPriority,
       byRag,
+      byRagPlanned,
       assessedLearningOutcomes: new Set(activeAssessments.flatMap((assessment) => assessment.learningOutcomeIds)).size,
     };
   }, [assessments]);
 
   const coverage = summary.total
-    ? Math.round(((summary.byRag.Green + summary.byRag.Amber + summary.byRag.Red) / summary.total) * 100)
+    ? Math.round(((summary.byRagPlanned.Green + summary.byRagPlanned.Amber + summary.byRagPlanned.Red) / summary.total) * 100)
     : 0;
 
   const openEditAssessment = (assessment: (typeof assessments)[0]) => {
@@ -116,6 +128,7 @@ function AssessPageContent() {
       duration: assessment.duration ?? "",
       priority: assessment.priority ?? "",
       rag: assessment.rag ?? "Amber",
+      ragPlanned: assessment.ragPlanned ?? "",
     });
   };
 
@@ -129,6 +142,7 @@ function AssessPageContent() {
       duration: editState.duration.trim(),
       priority: editState.priority || null,
       rag: editState.rag,
+      ragPlanned: editState.ragPlanned || null,
     });
     setEditState(emptyEdit);
   };
@@ -151,11 +165,20 @@ function AssessPageContent() {
         </article>
         <article className="rounded-2xl bg-slate-50 p-4">
           <p className="text-sm font-medium uppercase tracking-[0.2em] text-blue-600">AI taxonomy</p>
-          <p className="mt-2 text-sm text-slate-700">
-            🔴 {summary.byRag.Red} (Secure, No AI)<br />
-            🟡 {summary.byRag.Amber} (Optional AI)<br />
-            🟢 {summary.byRag.Green} (Mandatory AI)
-          </p>
+          <div className="mt-2 text-sm text-slate-700 grid grid-cols-2 gap-4">
+            <div>
+              <p className="font-semibold">Current:</p>
+              <p>🔴 {summary.byRag.Red} (Secure, No AI)</p>
+              <p>🟡 {summary.byRag.Amber} (Optional AI)</p>
+              <p>🟢 {summary.byRag.Green} (Mandatory AI)</p>
+            </div>
+            <div>
+              <p className="font-semibold">Planned:</p>
+              <p>🔴 {summary.byRagPlanned.Red} (Secure, No AI)</p>
+              <p>🟡 {summary.byRagPlanned.Amber} (Optional AI)</p>
+              <p>🟢 {summary.byRagPlanned.Green} (Mandatory AI)</p>
+            </div>
+          </div>
         </article>
 
         <article className="rounded-2xl bg-slate-50 p-4">
@@ -163,10 +186,12 @@ function AssessPageContent() {
           <div className="flex items-end justify-between gap-4">
             <div>
               <h2 className="mt-2 text-sm text-slate-900">
-                {(summary.byRag.Green + summary.byRag.Amber + summary.byRag.Red)}  of {summary.total} assessments categorised
+                {(summary.byRagPlanned.Green + summary.byRagPlanned.Amber + summary.byRagPlanned.Red)} of {summary.total} planned assessments
               </h2>
             </div>
-            <p className="text-2xl font-semibold text-slate-900">{coverage}%</p>
+            <p className="text-2xl font-semibold text-slate-900">
+              {summary.total ? Math.round(((summary.byRagPlanned.Green + summary.byRagPlanned.Amber + summary.byRagPlanned.Red) / summary.total) * 100) : 0}%
+            </p>
           </div>
           <div className="mt-4 h-3 rounded-full bg-slate-200">
             <div
@@ -191,7 +216,7 @@ function AssessPageContent() {
                 const moduleAssessments = [...assessments]
                   .filter((assessment) => assessment.moduleId === module.id)
                   .sort((a, b) => (a.assessmentCode || "").localeCompare(b.assessmentCode || "", undefined, { numeric: true, sensitivity: "base" }));
-                const draft = drafts[module.id] ?? { title: "", rag: "Amber" };
+                const draft = drafts[module.id] ?? { title: "", rag: "Amber", ragPlanned: "" };
                 const isAddFormOpen = openAddFormForModuleId === module.id;
 
                 return (
@@ -278,6 +303,21 @@ function AssessPageContent() {
                                     >
                                       {!assessment.rag ? "Missing AI taxonomy" : assessment.rag}
                                     </span>
+                                    {assessment.ragPlanned && assessment.ragPlanned !== "" && (
+                                      <span
+                                        className={`rounded-full px-2 py-1 text-xs font-semibold border-2 ${
+                                          assessment.ragPlanned === "Red"
+                                            ? "bg-red-50 text-red-700 border-red-200"
+                                            : assessment.ragPlanned === "Amber"
+                                              ? "bg-amber-50 text-amber-700 border-amber-200"
+                                              : assessment.ragPlanned === "Green"
+                                                ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                                                : "bg-slate-50 text-slate-700 border-slate-200"
+                                        }`}
+                                      >
+                                        Planned: {assessment.ragPlanned}
+                                      </span>
+                                    )}
                                   </>
                                 )}
                                 
@@ -350,11 +390,12 @@ function AssessPageContent() {
                                 moduleId: module.id,
                                 title: draft.title.trim(),
                                 rag: draft.rag,
+                                ragPlanned: draft.ragPlanned || null,
                               });
 
                               setDrafts((current) => ({
                                 ...current,
-                                [module.id]: { title: "", rag: "Amber" },
+                                [module.id]: { title: "", rag: "Amber", ragPlanned: "" },
                               }));
 
                               setOpenAddFormForModuleId(null);
@@ -394,6 +435,23 @@ function AssessPageContent() {
                               >
                                 {rags.map((rag) => (
                                   <option key={rag} value={rag}>
+                                    {rag}
+                                  </option>
+                                ))}
+                              </select>
+                              <select
+                                className="rounded-lg border border-slate-200 px-2 py-2 text-sm"
+                                value={draft.ragPlanned || ""}
+                                onChange={(event) =>
+                                  setDrafts((current) => ({
+                                    ...current,
+                                    [module.id]: { ...draft, ragPlanned: event.target.value as RagStatus },
+                                  }))
+                                }
+                              >
+                                <option value="">Planned</option>
+                                {rags.map((rag) => (
+                                  <option key={`planned-${rag}`} value={rag}>
                                     {rag}
                                   </option>
                                 ))}
@@ -517,7 +575,7 @@ function AssessPageContent() {
               </select>
             </label>
             <label className="block text-sm font-medium text-slate-700">
-              AI and Assessment taxonomy 
+              AI and Assessment taxonomy (Current)
               <select
                 className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm"
                 value={editState.rag}
@@ -525,6 +583,19 @@ function AssessPageContent() {
               >
                 {rags.map((r) => (
                   <option key={r} value={r}>{r}</option>
+                ))}
+              </select>
+            </label>
+            <label className="block text-sm font-medium text-slate-700">
+              AI and Assessment taxonomy (Planned)
+              <select
+                className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm"
+                value={editState.ragPlanned}
+                onChange={(e) => setEditState((s) => ({ ...s, ragPlanned: e.target.value as RagStatus }))}
+              >
+                <option value="">Not planned</option>
+                {rags.map((r) => (
+                  <option key={`planned-${r}`} value={r}>{r}</option>
                 ))}
               </select>
             </label>

@@ -82,6 +82,7 @@ type Assessment = {
   duration: string;
   priority: PriorityRating | null;
   rag: RagStatus | null;
+  ragPlanned: RagStatus | null;
   status?: "to_delete";
   learningOutcomeIds: string[];
   updatedAt: string;
@@ -188,13 +189,14 @@ type AppDataContextValue = {
       weight?: string;
       duration?: string;
       rag: RagStatus;
+      ragPlanned?: RagStatus | null;
       priority?: PriorityRating | null;
     },
   ) => string;
   updateAssessment: (
     assessmentId: string,
     patch: Partial<
-      Pick<Assessment, "assessmentCode" | "title" | "description" | "weight" | "duration" | "priority" | "rag" | "status" | "learningOutcomeIds" | "moduleId">
+      Pick<Assessment, "assessmentCode" | "title" | "description" | "weight" | "duration" | "priority" | "rag" | "ragPlanned" | "status" | "learningOutcomeIds" | "moduleId">
     >,
   ) => void;
   deleteAssessment: (assessmentId: string) => void;
@@ -680,6 +682,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
           duration: (assessment.duration as string) ?? "",
           priority: fromDbPriority((assessment.priority_rating as string | null) ?? null),
           rag: fromDbRag((assessment.rag_status as string | null) ?? null),
+          ragPlanned: fromDbRag((assessment.rag_planned_status as string | null) ?? null),
           status: (assessment.status as "to_delete" | undefined) ?? undefined,
           learningOutcomeIds: [],
           updatedAt: (assessment.updated_at as string) ?? new Date().toISOString(),
@@ -786,7 +789,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
     const changedAssessmentIds = state.assessments
       .filter((record) => {
         const previous = prev.assessments.find((item) => item.id === record.id);
-        return !previous || previous.title !== record.title || previous.description !== record.description || previous.moduleId !== record.moduleId || previous.assessmentCode !== record.assessmentCode || previous.weight !== record.weight || previous.duration !== record.duration || previous.priority !== record.priority || previous.rag !== record.rag || previous.status !== record.status;
+        return !previous || previous.title !== record.title || previous.description !== record.description || previous.moduleId !== record.moduleId || previous.assessmentCode !== record.assessmentCode || previous.weight !== record.weight || previous.duration !== record.duration || previous.priority !== record.priority || previous.rag !== record.rag || previous.ragPlanned !== record.ragPlanned || previous.status !== record.status;
       })
       .map((record) => record.id);
 
@@ -863,9 +866,14 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
           assessment.rag === "Red" || assessment.rag === "Amber" || assessment.rag === "Green"
             ? assessment.rag
             : null;
+        const ragPlanned: "Red" | "Amber" | "Green" | null =
+          assessment.ragPlanned === "Red" || assessment.ragPlanned === "Amber" || assessment.ragPlanned === "Green"
+            ? assessment.ragPlanned
+            : null;
         return {
           ...assessment,
           rag,
+          ragPlanned,
           syncStatus: dirtyAssessmentSet.has(a.id) ? "pending" : "synced",
           localUpdatedAt: dirtyAssessmentSet.has(a.id) ? ts : assessment.updatedAt,
         } as IdbAssessment;
@@ -1268,6 +1276,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
           duration: assessment.duration,
           priority_rating: assessment.priority?.toLowerCase() ?? null,
           rag_status: assessment.rag?.toLowerCase() ?? null,
+          rag_planned_status: assessment.ragPlanned?.toLowerCase() ?? null,
           status: assessment.status ?? null,
           updated_at: assessment.updatedAt,
         });
@@ -1479,6 +1488,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
           duration: (assessment.duration as string) ?? "",
           priority: fromDbPriority((assessment.priority_rating as string | null) ?? null),
           rag: fromDbRag((assessment.rag_status as string | null) ?? null),
+          ragPlanned: fromDbRag((assessment.rag_planned_status as string | null) ?? null),
           status: (assessment.status as "to_delete" | undefined) ?? undefined,
           learningOutcomeIds: [],
           updatedAt: (assessment.updated_at as string) ?? new Date().toISOString(),
@@ -1975,6 +1985,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
               duration: input.duration ?? "",
               priority: input.priority ?? null,
               rag: input.rag,
+              ragPlanned: input.ragPlanned ?? null,
               learningOutcomeIds: current.learningOutcomes
                 .filter((learningOutcome) => learningOutcome.moduleId === input.moduleId)
                 .map((learningOutcome) => learningOutcome.id),
@@ -2130,6 +2141,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
             duration: a.duration,
             priority: null,
             rag: null,
+            ragPlanned: null,
             learningOutcomeIds: moduleLoIds,
             updatedAt: new Date().toISOString(),
           });
