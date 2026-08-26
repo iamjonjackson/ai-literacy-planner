@@ -3,6 +3,8 @@
 import { Suspense, useState } from "react";
 import { useParams, useSearchParams } from "next/navigation";
 import { useAppData } from "@/lib/app-data";
+import { frameworkCompetencies } from "@/lib/framework";
+import { ConfirmModal } from "@/components/modal";
 
 const loCategories = ["Disciplinary Skills", "Academic Content", "Attributes"] as const;
 
@@ -10,9 +12,10 @@ function MapPageContent() {
   const params = useParams<{ id: string }>();
   const searchParams = useSearchParams();
   const programmeId = searchParams.get("programme") ?? params.id;
-  const { state, updateLearningOutcome, addLearningOutcome } = useAppData();
+  const { state, updateLearningOutcome, addLearningOutcome, deleteLearningOutcome } = useAppData();
   const [openAddFormForModuleId, setOpenAddFormForModuleId] = useState<string | null>(null);
   const [drafts, setDrafts] = useState<Record<string, { text: string; category: (typeof loCategories)[number] }>>({});
+  const [deleteLoState, setDeleteLoState] = useState<{ open: boolean; id: string }>({ open: false, id: "" });
 
 
   const modules = state.modules
@@ -138,6 +141,8 @@ function MapPageContent() {
                               <div className="mt-3 grid gap-4 lg:grid-cols-2">
                                 {(outcomesByModule.get(module.id) ?? []).map((learningOutcome) => {
                                   const isMarkedForDeletion = learningOutcome.status === "to_delete";
+                                  const competency = frameworkCompetencies.find((record) => record.id === learningOutcome.competencyId);
+                                  const competencyDescription = competency?.levels?.understand || competency?.levels?.apply || competency?.levels?.create || "";
                   
                                   return (
                                     <span
@@ -150,10 +155,26 @@ function MapPageContent() {
                                             : "border-slate-200 text-blue-700"
                                       }`}
                                     >
-                                      {/* {competency?.id ?? "Imported"}:  */}
-                                      {learningOutcome.category ? <span className="inline-block rounded-full bg-slate-200 px-2 py-1 text-xs font-semibold text-slate-700 mr-2">{learningOutcome.category}</span> : ""}
-                                      {/* {learningOutcome.loNumber ? `${learningOutcome.loNumber}. ` : ""} */}
-                                      {learningOutcome.text}
+                                      <div className="flex items-start gap-2">
+                                        {competency && (
+                                          <span
+                                            className="relative inline-block"
+                                          >
+                                            <span
+                                              className="inline-block rounded-full bg-blue-100 px-2 py-1 text-xs font-semibold text-blue-700 whitespace-nowrap"
+                                            >
+                                              {competency.id}
+                                            </span>
+                                            <span
+                                              className="tooltip-text"
+                                            >
+                                              {competency.title}: {competencyDescription.slice(0, 500)}{competencyDescription.length > 500 ? "..." : ""}
+                                            </span>
+                                          </span>
+                                        )}
+                                        {learningOutcome.category ? <span className="inline-block rounded-full bg-slate-200 px-2 py-1 text-xs font-semibold text-slate-700 mr-2">{learningOutcome.category}</span> : ""}
+                                        {learningOutcome.text}
+                                      </div>
                                       {!isViewer ? (
                                         <div className="mt-2 flex flex-wrap gap-2">
                                           {isMarkedForDeletion ? (
@@ -170,19 +191,37 @@ function MapPageContent() {
                                               >
                                                 Restore
                                               </button>
+                                              <button
+                                                type="button"
+                                                className="rounded-full border border-red-200 px-3 py-1 text-xs font-semibold text-red-700"
+                                                onClick={() =>
+                                                  setDeleteLoState({ open: true, id: learningOutcome.id })
+                                                }
+                                              >
+                                                Delete
+                                              </button>
                                             </>
-                                            // if does not have a mapped competency, allow mark for deletion
-
-                                          ) : learningOutcome.competencyId ? null : (
-                                            <button
-                                              type="button"
-                                              className="rounded-full border border-amber-200 px-3 py-1 text-xs font-semibold text-amber-700"
-                                              onClick={() =>
-                                                updateLearningOutcome(learningOutcome.id, { status: "to_delete" })
-                                              }
-                                            >
-                                              Mark for deletion
-                                            </button>
+                                          ) : (
+                                            <>
+                                              <button
+                                                type="button"
+                                                className="rounded-full border border-amber-200 px-3 py-1 text-xs font-semibold text-amber-700"
+                                                onClick={() =>
+                                                  updateLearningOutcome(learningOutcome.id, { status: "to_delete" })
+                                                }
+                                              >
+                                                Mark for deletion
+                                              </button>
+                                              <button
+                                                type="button"
+                                                className="rounded-full border border-red-200 px-3 py-1 text-xs font-semibold text-red-700"
+                                                onClick={() =>
+                                                  setDeleteLoState({ open: true, id: learningOutcome.id })
+                                                }
+                                              >
+                                                Delete
+                                              </button>
+                                            </>
                                           )}
                                         </div>
                                       ) : (
@@ -304,7 +343,8 @@ function MapPageContent() {
             <p className="text-sm text-slate-500">No learning outcomes yet.</p>
           ) : (
             [...newLearningOutcomes].sort(compareLearningOutcomes).map((learningOutcome) => {
-              // const competency = frameworkCompetencies.find((record) => record.id === learningOutcome.competencyId);
+              const competency = frameworkCompetencies.find((record) => record.id === learningOutcome.competencyId);
+              const competencyDescription = competency?.levels?.understand || competency?.levels?.apply || competency?.levels?.create || "";
 
               return (
                 <article
@@ -313,10 +353,25 @@ function MapPageContent() {
                     learningOutcome.moduleId ? "border-green-500 bg-green-50" : "border-slate-200"
                   }`}
                 >
-                  {/* <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                    {competency?.id ?? "Imported LO"}
-                  </p> */}
-                  <p className="mt-1 text-sm text-slate-700"><span className="inline-block rounded-full bg-slate-200 px-2 py-1 text-xs font-semibold text-slate-700 mr-2">{learningOutcome.category}</span> {learningOutcome.text}</p>
+                  <div className="flex items-start gap-2">
+                    {competency && (
+                      <span
+                        className="relative inline-block"
+                      >
+                        <span
+                          className="inline-block rounded-full bg-blue-100 px-2 py-1 text-xs font-semibold text-blue-700 whitespace-nowrap"
+                        >
+                          {competency.id}
+                        </span>
+                        <span
+                          className="tooltip-text"
+                        >
+                          {competency.title}: {competencyDescription.slice(0, 500)}{competencyDescription.length > 500 ? "..." : ""}
+                        </span>
+                      </span>
+                    )}
+                    <p className="mt-0 text-sm text-slate-700"><span className="inline-block rounded-full bg-slate-200 px-2 py-1 text-xs font-semibold text-slate-700 mr-2">{learningOutcome.category}</span> {learningOutcome.text}</p>
+                  </div>
                   <div className="mt-3 flex gap-2">
                     <select
                       className="flex-1 rounded-lg border border-slate-200 px-2 py-1 text-xs"
@@ -331,18 +386,27 @@ function MapPageContent() {
                       <option value="">Unmapped</option>
                       {modules.map((module) => (
                         <option key={module.id} value={module.id}>
-                          Year {module.year} · {module.code} {module.name.slice(0, 25)}{module.name.length > 25 ? "…" : ""}
+                          Year {module.year} · {module.code} {module.name.slice(0, 20)}{module.name.length > 20 ? "…" : ""}
                         </option>
                       ))}
                     </select>
                     {!isViewer ? (
-                      <button
-                        className="rounded-lg border border-slate-300 px-2 py-1 text-xs font-semibold text-slate-700"
-                        onClick={() => updateLearningOutcome(learningOutcome.id, { moduleId: null })}
-                        type="button"
-                      >
-                        Clear
-                      </button>
+                      <>
+                        <button
+                          className="rounded-lg border border-slate-300 px-2 py-1 text-xs font-semibold text-slate-700"
+                          onClick={() => updateLearningOutcome(learningOutcome.id, { moduleId: null })}
+                          type="button"
+                        >
+                          Clear
+                        </button>
+                        <button
+                          className="rounded-lg border border-red-200 px-2 py-1 text-xs font-semibold text-red-700"
+                          onClick={() => setDeleteLoState({ open: true, id: learningOutcome.id })}
+                          type="button"
+                        >
+                          Delete
+                        </button>
+                      </>
                     ) : null}
                   </div>
                 </article>
@@ -351,6 +415,19 @@ function MapPageContent() {
           )}
         </div>
       </aside>
+      
+      <ConfirmModal
+        open={deleteLoState.open}
+        onClose={() => setDeleteLoState({ open: false, id: "" })}
+        onConfirm={() => {
+          if (deleteLoState.id) {
+            deleteLearningOutcome(deleteLoState.id);
+          }
+        }}
+        title="Delete Learning Outcome"
+        message="This will permanently delete the learning outcome. Are you sure?"
+        confirmLabel="Delete"
+      />
     </div>
   );
 }

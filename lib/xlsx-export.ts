@@ -126,7 +126,7 @@ function assessmentSummaryRows(data: ExportData): XLSX.WorkSheet {
   // Build array of arrays with styling
   const headers = [
     "Module", "Module Code", "Assessment Code", "Assessment Title", "Weight", "Duration",
-    "Redesign Priority", "AI and Assessment taxonomy", "Year"
+    "Redesign Priority", "AI and Assessment taxonomy", "Notes", "Year"
   ];
   
   const aoa: any[][] = [];
@@ -147,6 +147,7 @@ function assessmentSummaryRows(data: ExportData): XLSX.WorkSheet {
       a.duration || "",
       priorityValue,
       a.rag || "",
+      a.description || "",
       yearValue,
     ];
     
@@ -285,15 +286,25 @@ function coverageMatrixRows(data: ExportData): XLSX.WorkSheet {
     return row;
   });
 
+  // Add footer row with UNESCO link
+  const footerRow: Record<string, unknown> = {
+    "Competency ID": `For more information on UNESCO AI competencies see ${getAppOrigin()}/explore`,
+    "Competency Title": "",
+    "LO Count": "",
+  };
+  for (const mod of sortedModules) {
+    footerRow[`${mod.code || mod.name} (Y${mod.year})`] = "";
+  }
+  rows.push(footerRow);
+
   const ws = makeSheet(rows);
   
-  // Add footer with UNESCO link
+  // Merge the footer row
   if (ws["!ref"]) {
     const ref = XLSX.utils.decode_range(ws["!ref"]);
-    const footerRow = ref.e.r + 1;
-    ws[`A${footerRow}`] = { t: "s", v: `For more information on UNESCO AI competencies see ${getAppOrigin()}/explore` };
+    const lastRow = ref.e.r;
     if (!ws["!merges"]) ws["!merges"] = [];
-    ws["!merges"].push({ s: { r: footerRow - 1, c: 0 }, e: { r: footerRow - 1, c: ref.e.c } });
+    ws["!merges"].push({ s: { r: lastRow, c: 0 }, e: { r: lastRow, c: ref.e.c } });
   }
   
   return ws;

@@ -13,7 +13,7 @@ type EditAssessmentState = {
   id: string;
   assessmentCode: string;
   title: string;
-  description: string;
+  notes: string;
   weight: string;
   duration: string;
   priority: PriorityRating | "";
@@ -25,7 +25,7 @@ const emptyEdit: EditAssessmentState = {
   id: "",
   assessmentCode: "",
   title: "",
-  description: "",
+  notes: "",
   weight: "",
   duration: "",
   priority: "",
@@ -51,7 +51,7 @@ function AssessPageContent() {
   const modulesByYear = useMemo(() => {
     const grouped: Record<string, typeof modules> = {};
 
-    modules.forEach((module) => {
+    [...modules].sort((a, b) => a.year - b.year || a.order - b.order).forEach((module) => {
       const yearValue = (module as { year?: string | number | null }).year;
       const year = yearValue !== undefined && yearValue !== null && `${yearValue}`.trim() !== ""
         ? `Year ${yearValue}`
@@ -111,7 +111,7 @@ function AssessPageContent() {
       id: assessment.id,
       assessmentCode: assessment.assessmentCode ?? "",
       title: assessment.title,
-      description: assessment.description ?? "",
+      notes: assessment.description ?? "",
       weight: assessment.weight ?? "",
       duration: assessment.duration ?? "",
       priority: assessment.priority ?? "",
@@ -124,7 +124,7 @@ function AssessPageContent() {
     updateAssessment(editState.id, {
       assessmentCode: editState.assessmentCode.trim(),
       title: editState.title.trim(),
-      description: editState.description.trim(),
+      description: editState.notes.trim(),
       weight: editState.weight.trim(),
       duration: editState.duration.trim(),
       priority: editState.priority || null,
@@ -188,7 +188,9 @@ function AssessPageContent() {
             <div key={year} className="space-y-4">
               <h2 className="text-lg font-semibold text-slate-900">{year}</h2>
               {yearModules.map((module) => {
-                const moduleAssessments = assessments.filter((assessment) => assessment.moduleId === module.id);
+                const moduleAssessments = [...assessments]
+                  .filter((assessment) => assessment.moduleId === module.id)
+                  .sort((a, b) => (a.assessmentCode || "").localeCompare(b.assessmentCode || "", undefined, { numeric: true, sensitivity: "base" }));
                 const draft = drafts[module.id] ?? { title: "", rag: "Amber" };
                 const isAddFormOpen = openAddFormForModuleId === module.id;
 
@@ -281,7 +283,7 @@ function AssessPageContent() {
                                 
                               </div>
                             </div>
-                            <p className="mt-2 text-sm text-slate-700">{assessment.description || "No description"}</p>
+                            <p className="mt-2 text-sm text-slate-700">{assessment.description || "No notes"}</p>
                             {!isViewer ? (
                               <div className="mt-3 flex flex-wrap gap-2">
                                 {assessment.status != "to_delete" ? (
@@ -474,12 +476,12 @@ function AssessPageContent() {
             />
           </label>
           <label className="block text-sm font-medium text-slate-700">
-            Description
+            Notes
             <textarea
               className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm"
               rows={3}
-              value={editState.description}
-              onChange={(e) => setEditState((s) => ({ ...s, description: e.target.value }))}
+              value={editState.notes}
+              onChange={(e) => setEditState((s) => ({ ...s, notes: e.target.value }))}
             />
           </label>
           <label className="block text-sm font-medium text-slate-700">
