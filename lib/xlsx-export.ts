@@ -25,15 +25,6 @@ function getAppOrigin(): string {
   return "";
 }
 
-// Helper to create styled cell for coloring
-function styledCell(value: string | number | boolean | Date, style: { fill: { fgColor: { rgb: string } }; font: { color: { rgb: string } } }): XLSX.CellObject {
-  return {
-    t: typeof value === 'number' ? 'n' : 's',
-    v: value,
-    s: style,
-  };
-}
-
 // Style definitions
 const priorityStyles = {
   High: { fill: { fgColor: { rgb: "374151" } }, font: { color: { rgb: "FFFFFF" } } },
@@ -49,7 +40,6 @@ const ragStyles = {
 
 function programmeOverviewRows(data: ExportData): XLSX.WorkSheet {
   const { programme, modules, learningOutcomes, assessments } = data;
-  const newLearningOutcomes = learningOutcomes.filter((lo) => lo.competencyId !== null).length;
   const assessmentsBeingReviewed = assessments.filter(
     (a) => a.priority !== null
   ).length;
@@ -60,7 +50,7 @@ function programmeOverviewRows(data: ExportData): XLSX.WorkSheet {
   ).size;
 
   // Two-column layout with no header row - just labels and values
-  const aoa: any[][] = [
+  const aoa: (string | number)[][] = [
     ["Programme name", programme.name],
     ["Description", programme.description || ""],
     ["Years", programme.years],
@@ -129,7 +119,7 @@ function assessmentSummaryRows(data: ExportData): XLSX.WorkSheet {
     "Notes", "Redesign Priority", "AI and Assessment taxonomy", "Year"
   ];
   
-  const aoa: any[][] = [];
+  const aoa: XLSX.CellObject[][] = [];
   aoa.push(headers.map(h => ({ t: "s", v: h })));
   
   sortedAssessments.forEach((a) => {
@@ -154,12 +144,12 @@ function assessmentSummaryRows(data: ExportData): XLSX.WorkSheet {
     const styledRow = rowData.map((value, colIdx) => {
       const cell: XLSX.CellObject = { t: typeof value === 'number' ? 'n' : 's', v: value };
       
-      if (colIdx === 7 && value && !isDeleted && (priorityStyles as Record<string, any>)[value]) {
-        cell.s = (priorityStyles as Record<string, any>)[value];
+      if (colIdx === 7 && value && !isDeleted && typeof value === "string" && value in priorityStyles) {
+        cell.s = priorityStyles[value as keyof typeof priorityStyles];
       }
       
-      if (colIdx === 8 && value && (ragStyles as Record<string, any>)[value]) {
-        cell.s = (ragStyles as Record<string, any>)[value];
+      if (colIdx === 8 && value && typeof value === "string" && value in ragStyles) {
+        cell.s = ragStyles[value as keyof typeof ragStyles];
       }
       
       return cell;
