@@ -110,23 +110,28 @@ function getDb(): Promise<IDBPDatabase<PlannerSchema>> {
   if (!dbPromise) {
     dbPromise = openDB<PlannerSchema>(DB_NAME, DB_VERSION, {
       upgrade(db) {
-        // programmes
-        const programmes = db.createObjectStore("programmes", { keyPath: "id" });
-        programmes.createIndex("by-owner", "ownerEmail");
+        // Only create object stores if they don't already exist
+        if (!db.objectStoreNames.contains("programmes")) {
+          const programmes = db.createObjectStore("programmes", { keyPath: "id" });
+          programmes.createIndex("by-owner", "ownerEmail");
+        }
 
-        // modules
-        const modules = db.createObjectStore("modules", { keyPath: "id" });
-        modules.createIndex("by-programme", "programmeId");
+        if (!db.objectStoreNames.contains("modules")) {
+          const modules = db.createObjectStore("modules", { keyPath: "id" });
+          modules.createIndex("by-programme", "programmeId");
+        }
 
-        // learning outcomes
-        const los = db.createObjectStore("learning_outcomes", { keyPath: "id" });
-        los.createIndex("by-programme", "programmeId");
-        los.createIndex("by-module", "moduleId");
+        if (!db.objectStoreNames.contains("learning_outcomes")) {
+          const los = db.createObjectStore("learning_outcomes", { keyPath: "id" });
+          los.createIndex("by-programme", "programmeId");
+          los.createIndex("by-module", "moduleId");
+        }
 
-        // assessments
-        const assessments = db.createObjectStore("assessments", { keyPath: "id" });
-        assessments.createIndex("by-module", "moduleId");
-        assessments.createIndex("by-programme", "programmeId");
+        if (!db.objectStoreNames.contains("assessments")) {
+          const assessments = db.createObjectStore("assessments", { keyPath: "id" });
+          assessments.createIndex("by-module", "moduleId");
+          assessments.createIndex("by-programme", "programmeId");
+        }
       },
     });
   }
