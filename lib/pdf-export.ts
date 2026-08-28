@@ -72,7 +72,7 @@ function addProgrammeStats(
       ["Modules", String(modules.length)],
       ["Learning Outcomes", String(learningOutcomes.length)],
       ["LOs mapped to modules", `${mapped} / ${learningOutcomes.length} (${coverage}%)`],
-      ["Competencies covered", `${competenciesCovered} / 12`],
+      ["AI Competencies covered", `${competenciesCovered} / 12`],
       ["Assessments", String(assessments.length)],
     ],
     styles: { fontSize: 9 },

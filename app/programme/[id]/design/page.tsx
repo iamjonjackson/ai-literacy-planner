@@ -85,7 +85,7 @@ function DesignPageContent() {
           <div>
             <p className="text-sm font-medium uppercase tracking-[0.2em] text-blue-600">Coverage tracker</p>
             <h2 className="mt-2 text-xl font-semibold text-slate-900">
-              {coveredCompetencies.size} of {frameworkCompetencies.length} competencies covered
+              {coveredCompetencies.size} of {frameworkCompetencies.length} AI competencies covered
             </h2>
           </div>
           <p className="text-2xl font-semibold text-slate-900">{coverage}%</p>

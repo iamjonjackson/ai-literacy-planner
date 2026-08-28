@@ -153,7 +153,7 @@ function AssessPageContent() {
       <section className="sticky -top-4 z-20 grid gap-4 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm md:grid-cols-4 backdrop-blur supports-[backdrop-filter]:bg-white/90">
 
         <article className="rounded-2xl bg-slate-50 p-4">
-          <p className="text-sm font-medium uppercase tracking-[0.2em] text-blue-600">Assessment Priority</p>
+          <p className="text-sm font-medium uppercase tracking-[0.2em] text-blue-600">Review Priority</p>
           <p className="mt-2 text-sm text-slate-700">
             {summary.byPriority.High} High<br />
             {summary.byPriority.Medium} Medium<br />
@@ -468,7 +468,7 @@ function AssessPageContent() {
                           <></>
                         ) : (
                           <>
-                            <h3 className="text-sm font-semibold text-slate-700">New Learning outcomes</h3>
+                            <h3 className="text-sm font-semibold text-slate-700">AI-related Learning outcomes</h3>
                             {learningOutcomes
                               .filter((lo) => lo.moduleId === module.id && lo.competencyId)
                               .map((learningOutcome) => {
