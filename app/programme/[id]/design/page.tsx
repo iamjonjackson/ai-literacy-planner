@@ -237,7 +237,7 @@ function DesignPageContent() {
                 setDraft("");
               }}
             >
-              <label className="text-md font-semibold text-slate-700">Add Learning Outcome</label>
+              <label className="text-md font-semibold text-slate-700">Add Learning Outcome (to be mapped)</label>
               <label className="space-y-1 my-4 block ">
                 <select
                   className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm"
