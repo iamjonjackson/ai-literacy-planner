@@ -5,6 +5,7 @@ import { useParams, useSearchParams } from "next/navigation";
 import { useAppData } from "@/lib/app-data";
 import { frameworkCompetencies } from "@/lib/framework";
 import { ConfirmModal } from "@/components/modal";
+import { EditLoModal, type EditLoState } from "@/components/edit-lo-modal";
 
 const loCategories = ["Disciplinary Skills", "Academic Content", "Attributes"] as const;
 
@@ -14,8 +15,9 @@ function MapPageContent() {
   const programmeId = searchParams.get("programme") ?? params.id;
   const { state, updateLearningOutcome, addLearningOutcome, deleteLearningOutcome } = useAppData();
   const [openAddFormForModuleId, setOpenAddFormForModuleId] = useState<string | null>(null);
-  const [drafts, setDrafts] = useState<Record<string, { text: string; category: (typeof loCategories)[number] }>>({});
+  const [drafts, setDrafts] = useState<Record<string, { text: string; category: (typeof loCategories)[number]; competencyId: string | null }>>({});
   const [deleteLoState, setDeleteLoState] = useState<{ open: boolean; id: string }>({ open: false, id: "" });
+  const [editLoState, setEditLoState] = useState<EditLoState>({ open: false, loId: "", text: "", category: loCategories[0], competencyId: null });
 
 
   const modules = state.modules
@@ -26,8 +28,8 @@ function MapPageContent() {
   const learningOutcomes = state.learningOutcomes.filter((learningOutcome) => learningOutcome.programmeId === programmeId);
 
   const compareLearningOutcomes = (
-    a: { loNumber?: string; text: string; id: string; category?: string },
-    b: { loNumber?: string; text: string; id: string; category?: string },
+    a: { loNumber?: string; text: string; id: string; category?: string; updatedAt?: string },
+    b: { loNumber?: string; text: string; id: string; category?: string; updatedAt?: string },
   ) => {
     const loA = a.loNumber ?? "";
     const loB = b.loNumber ?? "";
@@ -41,6 +43,11 @@ function MapPageContent() {
 
     const textDiff = a.text.localeCompare(b.text, undefined, { sensitivity: "base" });
     if (textDiff !== 0) return textDiff;
+
+    const updatedAtA = a.updatedAt ?? "";
+    const updatedAtB = b.updatedAt ?? "";
+    const updatedAtDiff = updatedAtA.localeCompare(updatedAtB);
+    if (updatedAtDiff !== 0) return updatedAtDiff;
 
     return a.id.localeCompare(b.id);
   };
@@ -67,6 +74,24 @@ function MapPageContent() {
   outcomesByModule.forEach((list, moduleId) => {
     outcomesByModule.set(moduleId, [...list].sort(compareLearningOutcomes));
   });
+
+  const handleEditLo = (loId: string, text: string, category?: string, competencyId?: string | null) => {
+    setEditLoState({
+      open: true,
+      loId,
+      text,
+      category: loCategories.includes(category as (typeof loCategories)[number])
+        ? (category as (typeof loCategories)[number])
+        : loCategories[0],
+      competencyId: competencyId ?? null,
+    });
+  };
+
+  const handleEditSave = (loId: string, text: string, category: (typeof loCategories)[number], competencyId: string | null) => {
+    if (text.trim().length < 10) return;
+    updateLearningOutcome(loId, { text: text.trim(), category, competencyId });
+    setEditLoState({ open: false, loId: "", text: "", category: loCategories[0], competencyId: null });
+  };
 
   return (
     <div className="grid gap-6 xl:grid-cols-[minmax(0,2fr)_460px]">
@@ -107,7 +132,7 @@ function MapPageContent() {
                         .filter((module) => module.year === year)
                         .sort((a, b) => a.order - b.order)
                         .map((module) => {
-                          const draft = drafts[module.id] ?? { text: "", category: loCategories[0] };
+                          const draft = drafts[module.id] ?? { text: "", category: loCategories[0], competencyId: null };
                           const isAddFormOpen = openAddFormForModuleId === module.id;
 
                           return (
@@ -155,26 +180,40 @@ function MapPageContent() {
                                             : "border-slate-200 text-blue-700"
                                       }`}
                                     >
-                                      <div className="flex items-start gap-2">
-                                        {competency && (
-                                          <span
-                                            className="relative inline-block"
+                                      <div className="flex items-start justify-between gap-2">
+                                        <div className="flex flex-col gap-2">
+                                          {competency && (
+                                            <span
+                                              className="relative inline-block"
+                                            >
+                                              <span
+                                                className="inline-block rounded-full bg-blue-100 px-2 py-1 text-xs font-semibold text-blue-700 whitespace-nowrap"
+                                              >
+                                                {competency.id}
+                                              </span>
+                                              <span
+                                                className="tooltip-text"
+                                              >
+                                                {competency.title}: {competencyDescription.slice(0, 500)}{competencyDescription.length > 500 ? "..." : ""}
+                                              </span>
+                                            </span>
+                                          )}
+                                          {learningOutcome.category && <span className="inline-block rounded-full bg-slate-200 px-2 py-1 text-xs font-semibold text-slate-700 whitespace-nowrap">{learningOutcome.category}</span>}
+                                          <p className="mt-1 text-xs text-slate-700">{learningOutcome.text}</p>
+                                        </div>
+                                        {!isViewer && (
+                                          <button
+                                            type="button"
+                                            className="text-slate-400 hover:text-slate-600"
+                                            onClick={() => handleEditLo(learningOutcome.id, learningOutcome.text, learningOutcome.category, learningOutcome.competencyId)}
+                                            aria-label="Edit"
                                           >
-                                            <span
-                                              className="inline-block rounded-full bg-blue-100 px-2 py-1 text-xs font-semibold text-blue-700 whitespace-nowrap"
-                                            >
-                                              {competency.id}
-                                            </span>
-                                            <span
-                                              className="tooltip-text"
-                                            >
-                                              {competency.title}: {competencyDescription.slice(0, 500)}{competencyDescription.length > 500 ? "..." : ""}
-                                            </span>
-                                          </span>
+                                            <svg className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                                              <path d="M13.896 3.012a2.25 2.25 0 0 0-2.684 0L3.333 10.667a2.25 2.25 0 0 0 0 2.684l7.88 7.88a2.25 2.25 0 0 0 2.684 0l7.88-7.88a2.25 2.25 0 0 0 0-2.684L13.896 3.012Z" />
+                                            </svg>
+                                          </button>
                                         )}
-                                        {learningOutcome.category && <span className="inline-block rounded-full bg-slate-200 px-2 py-1 text-xs font-semibold text-slate-700 whitespace-nowrap">{learningOutcome.category}</span>}
                                       </div>
-                                      <p className="mt-1 text-xs text-slate-700">{learningOutcome.text}</p>
                                       {!isViewer ? (
                                         <div className="mt-2 flex flex-wrap gap-2">
                                           {isMarkedForDeletion ? (
@@ -259,7 +298,7 @@ function MapPageContent() {
                                     }
 
                                     const loId = addLearningOutcome(programmeId, {
-                                      competencyId: null,
+                                      competencyId: draft.competencyId,
                                       text: draft.text.trim(),
                                       category: draft.category,
                                     });
@@ -269,7 +308,7 @@ function MapPageContent() {
 
                                     setDrafts((current) => ({
                                       ...current,
-                                      [module.id]: { text: "", category: loCategories[0] },
+                                      [module.id]: { text: "", category: loCategories[0], competencyId: null },
                                     }));
 
                                     setOpenAddFormForModuleId(null);
@@ -287,6 +326,7 @@ function MapPageContent() {
                                   </div>
                                   <div className="mt-3 space-y-3">
                                     <label className="block">
+                                      <span className="text-sm font-medium text-slate-700">Category</span>
                                       <select
                                         className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
                                         value={draft.category}
@@ -302,6 +342,30 @@ function MapPageContent() {
                                             {category}
                                           </option>
                                         ))}
+                                      </select>
+                                    </label>
+                                    <label className="block">
+                                      <span className="text-sm font-medium text-slate-700">UNESCO AI Competency (optional)</span>
+                                      <select
+                                        className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+                                        value={draft.competencyId ?? ""}
+                                        onChange={(event) =>
+                                          setDrafts((current) => ({
+                                            ...current,
+                                            [module.id]: { ...draft, competencyId: event.target.value || null },
+                                          }))
+                                        }
+                                      >
+                                        <option value="">-- None --</option>
+                                        {frameworkCompetencies.map((competency) => {
+                                          const description = competency.levels?.understand || competency.levels?.apply || competency.levels?.create || "";
+                                          const truncatedDescription = description.slice(0, 60) + (description.length > 60 ? "..." : "");
+                                          return (
+                                            <option key={competency.id} value={competency.id}>
+                                              {competency.id} - {competency.title} ({truncatedDescription})
+                                            </option>
+                                          );
+                                        })}
                                       </select>
                                     </label>
                                     <textarea
@@ -387,7 +451,7 @@ function MapPageContent() {
                       <option value="">Unmapped</option>
                       {modules.map((module) => (
                         <option key={module.id} value={module.id}>
-                          Year {module.year} · {module.code} {module.name.slice(0, 20)}{module.name.length > 20 ? "…" : ""}
+                          Year {module.year}  {module.code} {module.name.slice(0, 20)}{module.name.length > 20 ? "" : ""}
                         </option>
                       ))}
                     </select>
@@ -416,6 +480,12 @@ function MapPageContent() {
           )}
         </div>
       </aside>
+      
+      <EditLoModal
+        state={editLoState}
+        onClose={() => setEditLoState({ open: false, loId: "", text: "", category: loCategories[0], competencyId: null })}
+        onSave={handleEditSave}
+      />
       
       <ConfirmModal
         open={deleteLoState.open}
