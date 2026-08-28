@@ -468,7 +468,7 @@ function AssessPageContent() {
                           <></>
                         ) : (
                           <>
-                            <h3 className="text-sm font-semibold text-slate-700">New Learning outcomes</h3>
+                            <h3 className="text-sm font-semibold text-slate-700">AI-related Learning outcomes</h3>
                             {learningOutcomes
                               .filter((lo) => lo.moduleId === module.id && lo.competencyId)
                               .map((learningOutcome) => {

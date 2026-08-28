@@ -81,10 +81,17 @@ function MapPageContent() {
     (learningOutcome) => learningOutcome.status !== "to_delete",
   );
 
+  const coveredCompetencies = new Set(
+    learningOutcomes.filter((learningOutcome) => learningOutcome.competencyId).map((learningOutcome) => learningOutcome.competencyId),
+  );
+  const competencyCoverage = Math.round((coveredCompetencies.size / frameworkCompetencies.length) * 100);
+
   const mapped = activeNewLearningOutcomes.filter((learningOutcome) => learningOutcome.moduleId).length;
   const mappingCoverage = activeNewLearningOutcomes.length
     ? Math.round((mapped / activeNewLearningOutcomes.length) * 100)
     : 0;
+  
+  const hasUnmappedLOs = activeNewLearningOutcomes.some((lo) => !lo.moduleId);
 
   const outcomesByModule = new Map<string, typeof learningOutcomes>();
   learningOutcomes.forEach((learningOutcome) => {
@@ -143,23 +150,42 @@ function MapPageContent() {
         <div className="sticky -top-4 z-20 rounded-3xl border border-slate-200 bg-white/95 p-6 shadow-sm backdrop-blur supports-[backdrop-filter]:bg-white/90">
           <div className="flex items-end justify-between gap-4">
             <div>
-              <p className="text-sm font-medium uppercase tracking-[0.2em] text-blue-600">Mapping coverage</p>
+              <p className="text-sm font-medium uppercase tracking-[0.2em] text-blue-600">Coverage tracker</p>
               <h2 className="mt-2 text-xl font-semibold text-slate-900">
-                {mapped} of {activeNewLearningOutcomes.length} new LOs mapped to modules
+                {coveredCompetencies.size} of {frameworkCompetencies.length} AI competencies covered
               </h2>
             </div>
-            <p className="text-2xl font-semibold text-slate-900">{mappingCoverage}%</p>
+            <p className="text-2xl font-semibold text-slate-900">{competencyCoverage}%</p>
           </div>
           <div className="my-4 h-3 rounded-full bg-slate-200">
             <div
-              className={`h-3 rounded-full ${mappingCoverage === 100 ? "bg-emerald-500" : "bg-blue-600"}`}
-              style={{ width: `${mappingCoverage}%` }}
+              className={`h-3 rounded-full ${competencyCoverage === 100 ? "bg-emerald-500" : "bg-blue-600"}`}
+              style={{ width: `${competencyCoverage}%` }}
             />
           </div>
-          <p className="text-sm text-slate-600">
-            {modules.length} module{modules.length !== 1 ? "s" : ""} in this programme under review
-          </p>
         </div>
+        {hasUnmappedLOs && (
+          <div className="sticky -top-4 z-20 rounded-3xl border border-slate-200 bg-white/95 p-6 shadow-sm backdrop-blur supports-[backdrop-filter]:bg-white/90">
+            <div className="flex items-end justify-between gap-4">
+              <div>
+                <p className="text-sm font-medium uppercase tracking-[0.2em] text-blue-600">Mapping coverage</p>
+                <h2 className="mt-2 text-xl font-semibold text-slate-900">
+                  {mapped} of {activeNewLearningOutcomes.length} new LOs mapped to modules
+                </h2>
+              </div>
+              <p className="text-2xl font-semibold text-slate-900">{mappingCoverage}%</p>
+            </div>
+            <div className="my-4 h-3 rounded-full bg-slate-200">
+              <div
+                className={`h-3 rounded-full ${mappingCoverage === 100 ? "bg-emerald-500" : "bg-blue-600"}`}
+                style={{ width: `${mappingCoverage}%` }}
+              />
+            </div>
+            <p className="text-sm text-slate-600">
+              {modules.length} module{modules.length !== 1 ? "s" : ""} in this programme under review
+            </p>
+          </div>
+        )}
         
         <div className="space-y-4">
           {modules.length === 0 ? (
@@ -203,7 +229,7 @@ function MapPageContent() {
                                   </span>
 
                                 </div>
-                                <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
+                                <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600 whitespace-nowrap">
                                   {(outcomesByModule.get(module.id) ?? []).filter((learningOutcome) => learningOutcome.status !== "to_delete").length} LOs
                                 </span>
                               </div>
