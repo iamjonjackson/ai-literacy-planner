@@ -82,7 +82,6 @@ function coverageStatsRows(data: ExportData) {
   const ragPlannedCounts: Record<string, number> = { Red: 0, Amber: 0, Green: 0, Unrated: 0 };
   const totalAssessments = assessments.length;
   const priorityCounts: Record<string, number> = { High: 0, Medium: 0, Low: 0, "No action required": 0 };
-  const totalAssessments = assessments.length;
 
   for (const a of assessments) {
     if (a.rag) ragCounts[a.rag]++;

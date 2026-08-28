@@ -3,6 +3,7 @@
 import { Suspense, useMemo, useState } from "react";
 import { useParams, useSearchParams } from "next/navigation";
 import { useAppData, type PriorityRating, type RagStatus } from "@/lib/app-data";
+import { frameworkCompetencies } from "@/lib/framework";
 import { Modal, ConfirmModal } from "@/components/modal";
 
 const priorities: PriorityRating[] = ["High", "Medium", "Low"];
@@ -150,12 +151,9 @@ function AssessPageContent() {
   return (
     <div className="space-y-6">
       <section className="sticky -top-4 z-20 grid gap-4 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm md:grid-cols-4 backdrop-blur supports-[backdrop-filter]:bg-white/90">
+
         <article className="rounded-2xl bg-slate-50 p-4">
-          <p className="text-sm font-medium uppercase tracking-[0.2em] text-blue-600">Total assessments</p>
-          <p className="mt-2 text-2xl font-semibold text-slate-900">{summary.total}</p>
-        </article>
-        <article className="rounded-2xl bg-slate-50 p-4">
-          <p className="text-sm font-medium uppercase tracking-[0.2em] text-blue-600">Priority</p>
+          <p className="text-sm font-medium uppercase tracking-[0.2em] text-blue-600">Assessment Priority</p>
           <p className="mt-2 text-sm text-slate-700">
             {summary.byPriority.High} High<br />
             {summary.byPriority.Medium} Medium<br />
@@ -163,17 +161,17 @@ function AssessPageContent() {
             {summary.total - summary.byPriority.High - summary.byPriority.Medium - summary.byPriority.Low} No action required
           </p>
         </article>
-        <article className="rounded-2xl bg-slate-50 p-4">
+        <article className="rounded-2xl bg-slate-50 p-4 md:col-span-2">
           <p className="text-sm font-medium uppercase tracking-[0.2em] text-blue-600">AI taxonomy</p>
           <div className="mt-2 text-sm text-slate-700 grid grid-cols-2 gap-4">
             <div>
-              <p className="font-semibold">Current:</p>
+              <p className="font-semibold">Current</p>
               <p>🔴 {summary.byRag.Red} (Secure, No AI)</p>
               <p>🟡 {summary.byRag.Amber} (Optional AI)</p>
               <p>🟢 {summary.byRag.Green} (Mandatory AI)</p>
             </div>
             <div>
-              <p className="font-semibold">Planned:</p>
+              <p className="font-semibold">Planned</p>
               <p>🔴 {summary.byRagPlanned.Red} (Secure, No AI)</p>
               <p>🟡 {summary.byRagPlanned.Amber} (Optional AI)</p>
               <p>🟢 {summary.byRagPlanned.Green} (Mandatory AI)</p>
@@ -182,11 +180,11 @@ function AssessPageContent() {
         </article>
 
         <article className="rounded-2xl bg-slate-50 p-4">
-          <p className="text-sm font-medium uppercase tracking-[0.2em] text-blue-600">Taxonomy Tracker</p>
+          <p className="text-sm font-medium uppercase tracking-[0.2em] text-blue-600">AI Taxonomy Tracker</p>
           <div className="flex items-end justify-between gap-4">
             <div>
               <h2 className="mt-2 text-sm text-slate-900">
-                {(summary.byRagPlanned.Green + summary.byRagPlanned.Amber + summary.byRagPlanned.Red)} of {summary.total} planned assessments
+                {(summary.byRagPlanned.Green + summary.byRagPlanned.Amber + summary.byRagPlanned.Red)} of {summary.total} assessments labelled
               </h2>
             </div>
             <p className="text-2xl font-semibold text-slate-900">
@@ -291,14 +289,14 @@ function AssessPageContent() {
                                       {assessment.priority ?? "No action required"}
                                     </span>
                                     <span
-                                      className={`rounded-full px-2 py-1 text-xs font-semibold ${
+                                      className={`rounded-full px-2 py-1 text-xs font-semibold border-2 ${
                                         assessment.rag === "Red"
-                                          ? "bg-red-100 text-red-700"
+                                          ? "bg-red-50 text-red-700 border-red-200"
                                           : assessment.rag === "Amber"
-                                            ? "bg-amber-100 text-amber-700"
+                                            ? "bg-amber-50 text-amber-700 border-amber-200"
                                             : assessment.rag === "Green"
-                                              ? "bg-emerald-100 text-emerald-700"
-                                              : "bg-slate-100 text-slate-700"
+                                              ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                                              : "bg-slate-50 text-slate-700 border-slate-200"
                                       }`}
                                     >
                                       {!assessment.rag ? "Missing AI taxonomy" : assessment.rag}
@@ -449,7 +447,6 @@ function AssessPageContent() {
                                   }))
                                 }
                               >
-                                <option value="">Planned</option>
                                 {rags.map((rag) => (
                                   <option key={`planned-${rag}`} value={rag}>
                                     {rag}
@@ -475,13 +472,28 @@ function AssessPageContent() {
                             {learningOutcomes
                               .filter((lo) => lo.moduleId === module.id && lo.competencyId)
                               .map((learningOutcome) => {
+                                const competency = frameworkCompetencies.find((record) => record.id === learningOutcome.competencyId);
+                                const competencyDescription = competency?.levels?.understand || competency?.levels?.apply || competency?.levels?.create || "";
 
                                 return (
                                   <article
                                     key={learningOutcome.id}
                                     className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm"
                                   >
-                                    <span className="inline-block rounded-full bg-slate-200 px-2 py-1 text-xs font-semibold text-slate-700 mr-2">{learningOutcome.category}</span> {learningOutcome.text}
+                                    <div className="flex items-start gap-2">
+                                      {competency && (
+                                        <span className="relative inline-block">
+                                          <span className="inline-block rounded-full bg-blue-100 px-2 py-1 text-xs font-semibold text-blue-700 whitespace-nowrap">
+                                            {competency.id}
+                                          </span>
+                                          <span className="tooltip-text">
+                                            {competency.title}: {competencyDescription.slice(0, 500)}{competencyDescription.length > 500 ? "..." : ""}
+                                          </span>
+                                        </span>
+                                      )}
+                                      {learningOutcome.category && <span className="inline-block rounded-full bg-slate-200 px-2 py-1 text-xs font-semibold text-slate-700 whitespace-nowrap">{learningOutcome.category}</span>}
+                                    </div>
+                                    <p className="mt-1 text-sm text-slate-700">{learningOutcome.text}</p>
                                   </article>
                                 );
                             })}
@@ -574,8 +586,10 @@ function AssessPageContent() {
                 ))}
               </select>
             </label>
+          </div>
+          <div className="grid gap-4 sm:grid-cols-2">
             <label className="block text-sm font-medium text-slate-700">
-              AI and Assessment taxonomy (Current)
+              AI taxonomy (Current)
               <select
                 className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm"
                 value={editState.rag}
@@ -587,13 +601,12 @@ function AssessPageContent() {
               </select>
             </label>
             <label className="block text-sm font-medium text-slate-700">
-              AI and Assessment taxonomy (Planned)
+              AI taxonomy (Planned)
               <select
                 className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm"
                 value={editState.ragPlanned}
                 onChange={(e) => setEditState((s) => ({ ...s, ragPlanned: e.target.value as RagStatus }))}
               >
-                <option value="">Not planned</option>
                 {rags.map((r) => (
                   <option key={`planned-${r}`} value={r}>{r}</option>
                 ))}
