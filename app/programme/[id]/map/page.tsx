@@ -172,9 +172,9 @@ function MapPageContent() {
                                             </span>
                                           </span>
                                         )}
-                                        {learningOutcome.category ? <span className="inline-block rounded-full bg-slate-200 px-2 py-1 text-xs font-semibold text-slate-700 mr-2">{learningOutcome.category}</span> : ""}
-                                        {learningOutcome.text}
+                                        {learningOutcome.category && <span className="inline-block rounded-full bg-slate-200 px-2 py-1 text-xs font-semibold text-slate-700 whitespace-nowrap">{learningOutcome.category}</span>}
                                       </div>
+                                      <p className="mt-1 text-xs text-slate-700">{learningOutcome.text}</p>
                                       {!isViewer ? (
                                         <div className="mt-2 flex flex-wrap gap-2">
                                           {isMarkedForDeletion ? (
@@ -370,8 +370,9 @@ function MapPageContent() {
                         </span>
                       </span>
                     )}
-                    <p className="mt-0 text-sm text-slate-700"><span className="inline-block rounded-full bg-slate-200 px-2 py-1 text-xs font-semibold text-slate-700 mr-2">{learningOutcome.category}</span> {learningOutcome.text}</p>
+                    {learningOutcome.category && <span className="inline-block rounded-full bg-slate-200 px-2 py-1 text-xs font-semibold text-slate-700 whitespace-nowrap">{learningOutcome.category}</span>}
                   </div>
+                  <p className="mt-1 text-sm text-slate-700">{learningOutcome.text}</p>
                   <div className="mt-3 flex gap-2">
                     <select
                       className="flex-1 rounded-lg border border-slate-200 px-2 py-1 text-xs"

@@ -117,11 +117,15 @@ function addAssessmentSummary(doc: jsPDF, startY: number, data: ExportData): num
   const { assessments } = data;
 
   const ragCounts = { Red: 0, Amber: 0, Green: 0, Unrated: 0 };
+  const ragPlannedCounts = { Red: 0, Amber: 0, Green: 0, Unrated: 0 };
+  const totalAssessments = assessments.length;
   const priorityCounts = { High: 0, Medium: 0, Low: 0, None: 0 };
 
   for (const a of assessments) {
     if (a.rag) ragCounts[a.rag]++;
     else ragCounts.Unrated++;
+    if (a.ragPlanned) ragPlannedCounts[a.ragPlanned]++;
+    else ragPlannedCounts.Unrated++;
     if (a.priority) priorityCounts[a.priority]++;
     else priorityCounts.None++;
   }
@@ -129,7 +133,16 @@ function addAssessmentSummary(doc: jsPDF, startY: number, data: ExportData): num
   autoTable(doc, {
     startY,
     head: [["AI and Assessment taxonomy", "Count"]],
-    body: Object.entries(ragCounts).map(([k, v]) => [k, String(v)]),
+    body: [
+      ["Current Red", String(ragCounts.Red)],
+      ["Current Amber", String(ragCounts.Amber)],
+      ["Current Green", String(ragCounts.Green)],
+      ["Current Unrated", String(ragCounts.Unrated)],
+      ["Planned Red", String(ragPlannedCounts.Red)],
+      ["Planned Amber", String(ragPlannedCounts.Amber)],
+      ["Planned Green", String(ragPlannedCounts.Green)],
+      ["Planned Unrated", String(ragPlannedCounts.Unrated)],
+    ],
     styles: { fontSize: 9 },
     headStyles: { fillColor: BRAND_BLUE },
     alternateRowStyles: { fillColor: LIGHT },
