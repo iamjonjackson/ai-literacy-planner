@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { frameworkCompetencies } from "@/lib/framework";
 import { Modal } from "@/components/modal";
 
@@ -19,13 +19,17 @@ type EditLoModalProps = {
   onClose: () => void;
   onSave: (loId: string, text: string, category: (typeof loCategories)[number], competencyId: string | null) => void;
   title?: string;
+  onDelete?: () => void;
+  onMarkForDeletion?: () => void;
+  onRestore?: () => void;
+  isMarkedForDeletion?: boolean;
 };
 
-export function EditLoModal({ state, onClose, onSave, title = "Edit learning outcome" }: EditLoModalProps) {
+export function EditLoModal({ state, onClose, onSave, title = "Edit learning outcome", onDelete, onMarkForDeletion, onRestore, isMarkedForDeletion }: EditLoModalProps) {
   const [editState, setEditState] = useState<EditLoState>(state);
 
   // Update internal state when external state changes (for opening modal)
-  useState(() => {
+  useEffect(() => {
     if (state.open) {
       setEditState(state);
     }
@@ -114,6 +118,56 @@ export function EditLoModal({ state, onClose, onSave, title = "Edit learning out
             Save changes
           </button>
         </div>
+        {onDelete || onMarkForDeletion || onRestore ? (
+          <div className="mt-4 flex flex-wrap gap-2 border-t border-slate-200 pt-4">
+            {isMarkedForDeletion ? (
+              <>
+                <span className="rounded-full bg-amber-200 inline-block px-2 py-1 text-xs font-semibold text-amber-800">
+                  For deletion
+                </span>
+                {onRestore && (
+                  <button
+                    type="button"
+                    className="rounded-full border border-emerald-200 px-3 py-1 text-xs font-semibold text-emerald-700"
+                    onClick={onRestore}
+                  >
+                    Restore
+                  </button>
+                )}
+                {onDelete && (
+                  <button
+                    type="button"
+                    className="rounded-full border border-red-200 px-3 py-1 text-xs font-semibold text-red-700"
+                    onClick={onDelete}
+                  >
+                    Delete
+                  </button>
+                )}
+              </>
+            ) : (
+              <>
+                {onMarkForDeletion && (
+                  <button
+                    type="button"
+                    className="rounded-full border border-amber-200 px-3 py-1 text-xs font-semibold text-amber-700"
+                    onClick={onMarkForDeletion}
+                  >
+                    Mark for deletion
+                  </button>
+                )}
+                {onDelete && (
+                  <button
+                    type="button"
+                    className="rounded-full border border-red-200 px-3 py-1 text-xs font-semibold text-red-700"
+                    onClick={onDelete}
+                  >
+                    Delete
+                  </button>
+                )}
+              </>
+            )}
+          </div>
+        ) : null}
       </form>
     </Modal>
   );

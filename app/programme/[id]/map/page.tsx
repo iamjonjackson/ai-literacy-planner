@@ -18,7 +18,7 @@ function MapPageContent() {
   const [drafts, setDrafts] = useState<Record<string, { text: string; category: (typeof loCategories)[number]; competencyId: string | null }>>({});
   const [deleteLoState, setDeleteLoState] = useState<{ open: boolean; id: string }>({ open: false, id: "" });
   const [editLoState, setEditLoState] = useState<EditLoState>({ open: false, loId: "", text: "", category: loCategories[0], competencyId: null });
-
+  const [currentLoStatus, setCurrentLoStatus] = useState<string | undefined>(undefined);
 
   const modules = state.modules
     .filter((module) => module.programmeId === programmeId)
@@ -75,7 +75,7 @@ function MapPageContent() {
     outcomesByModule.set(moduleId, [...list].sort(compareLearningOutcomes));
   });
 
-  const handleEditLo = (loId: string, text: string, category?: string, competencyId?: string | null) => {
+  const handleEditLo = (loId: string, text: string, category?: string, competencyId?: string | null, status?: string) => {
     setEditLoState({
       open: true,
       loId,
@@ -85,12 +85,32 @@ function MapPageContent() {
         : loCategories[0],
       competencyId: competencyId ?? null,
     });
+    setCurrentLoStatus(status);
   };
 
   const handleEditSave = (loId: string, text: string, category: (typeof loCategories)[number], competencyId: string | null) => {
     if (text.trim().length < 10) return;
     updateLearningOutcome(loId, { text: text.trim(), category, competencyId });
     setEditLoState({ open: false, loId: "", text: "", category: loCategories[0], competencyId: null });
+    setCurrentLoStatus(undefined);
+  };
+
+  const handleMarkForDeletion = (loId: string) => {
+    updateLearningOutcome(loId, { status: "to_delete" });
+    setEditLoState({ open: false, loId: "", text: "", category: loCategories[0], competencyId: null });
+    setCurrentLoStatus(undefined);
+  };
+
+  const handleRestore = (loId: string) => {
+    updateLearningOutcome(loId, { status: undefined });
+    setEditLoState({ open: false, loId: "", text: "", category: loCategories[0], competencyId: null });
+    setCurrentLoStatus(undefined);
+  };
+
+  const handleDeleteFromModal = (loId: string) => {
+    setDeleteLoState({ open: true, id: loId });
+    setEditLoState({ open: false, loId: "", text: "", category: loCategories[0], competencyId: null });
+    setCurrentLoStatus(undefined);
   };
 
   return (
@@ -205,75 +225,22 @@ function MapPageContent() {
                                           <button
                                             type="button"
                                             className="text-slate-400 hover:text-slate-600"
-                                            onClick={() => handleEditLo(learningOutcome.id, learningOutcome.text, learningOutcome.category, learningOutcome.competencyId)}
+                                            onClick={() => handleEditLo(learningOutcome.id, learningOutcome.text, learningOutcome.category, learningOutcome.competencyId, learningOutcome.status)}
                                             aria-label="Edit"
                                           >
-                                            <svg className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                                              <path d="M13.896 3.012a2.25 2.25 0 0 0-2.684 0L3.333 10.667a2.25 2.25 0 0 0 0 2.684l7.88 7.88a2.25 2.25 0 0 0 2.684 0l7.88-7.88a2.25 2.25 0 0 0 0-2.684L13.896 3.012Z" />
-                                            </svg>
+                                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="size-6">
+  <path strokeLinecap="round" strokeLinejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0 1 15.75 21H5.25A2.25 2.25 0 0 1 3 18.75V8.25A2.25 2.25 0 0 1 5.25 6H10" />
+</svg>
                                           </button>
                                         )}
                                       </div>
-                                      {!isViewer ? (
+                                      {isMarkedForDeletion ? (
                                         <div className="mt-2 flex flex-wrap gap-2">
-                                          {isMarkedForDeletion ? (
-                                            <>
-                                              <span className="rounded-full bg-amber-200 inline-block px-2 py-1 m-0 text-xs font-semibold text-amber-800">
-                                                For deletion
-                                              </span>
-                                              <button
-                                                type="button"
-                                                className="rounded-full border border-emerald-200 px-3 py-1 text-xs font-semibold text-emerald-700"
-                                                onClick={() =>
-                                                  updateLearningOutcome(learningOutcome.id, { status: undefined })
-                                                }
-                                              >
-                                                Restore
-                                              </button>
-                                              <button
-                                                type="button"
-                                                className="rounded-full border border-red-200 px-3 py-1 text-xs font-semibold text-red-700"
-                                                onClick={() =>
-                                                  setDeleteLoState({ open: true, id: learningOutcome.id })
-                                                }
-                                              >
-                                                Delete
-                                              </button>
-                                            </>
-                                          ) : (
-                                            <>
-                                              <button
-                                                type="button"
-                                                className="rounded-full border border-amber-200 px-3 py-1 text-xs font-semibold text-amber-700"
-                                                onClick={() =>
-                                                  updateLearningOutcome(learningOutcome.id, { status: "to_delete" })
-                                                }
-                                              >
-                                                Mark for deletion
-                                              </button>
-                                              <button
-                                                type="button"
-                                                className="rounded-full border border-red-200 px-3 py-1 text-xs font-semibold text-red-700"
-                                                onClick={() =>
-                                                  setDeleteLoState({ open: true, id: learningOutcome.id })
-                                                }
-                                              >
-                                                Delete
-                                              </button>
-                                            </>
-                                          )}
+                                          <span className="rounded-full bg-amber-200 inline-block px-2 py-1 m-0 text-xs font-semibold text-amber-800">
+                                            For deletion
+                                          </span>
                                         </div>
-                                      ) : (
-                                        <>
-                                          {isMarkedForDeletion ? (
-                                            <div className="mt-2 flex flex-wrap gap-2">
-                                              <span className="mt-2 inline-block rounded-full bg-amber-200 px-2 py-1 m-0 text-xs font-semibold text-amber-800">
-                                                For deletion
-                                              </span>
-                                            </div>
-                                          ) : null}
-                                        </>
-                                      )}
+                                      ) : null}
                                     </span>
                                   );
                                 })}
@@ -456,22 +423,13 @@ function MapPageContent() {
                       ))}
                     </select>
                     {!isViewer ? (
-                      <>
-                        <button
-                          className="rounded-lg border border-slate-300 px-2 py-1 text-xs font-semibold text-slate-700"
-                          onClick={() => updateLearningOutcome(learningOutcome.id, { moduleId: null })}
-                          type="button"
-                        >
-                          Clear
-                        </button>
-                        <button
-                          className="rounded-lg border border-red-200 px-2 py-1 text-xs font-semibold text-red-700"
-                          onClick={() => setDeleteLoState({ open: true, id: learningOutcome.id })}
-                          type="button"
-                        >
-                          Delete
-                        </button>
-                      </>
+                      <button
+                        className="rounded-lg border border-slate-300 px-2 py-1 text-xs font-semibold text-slate-700"
+                        onClick={() => updateLearningOutcome(learningOutcome.id, { moduleId: null })}
+                        type="button"
+                      >
+                        Clear
+                      </button>
                     ) : null}
                   </div>
                 </article>
@@ -483,8 +441,15 @@ function MapPageContent() {
       
       <EditLoModal
         state={editLoState}
-        onClose={() => setEditLoState({ open: false, loId: "", text: "", category: loCategories[0], competencyId: null })}
+        onClose={() => {
+          setEditLoState({ open: false, loId: "", text: "", category: loCategories[0], competencyId: null });
+          setCurrentLoStatus(undefined);
+        }}
         onSave={handleEditSave}
+        onDelete={editLoState.loId ? () => handleDeleteFromModal(editLoState.loId) : undefined}
+        onMarkForDeletion={editLoState.loId ? () => handleMarkForDeletion(editLoState.loId) : undefined}
+        onRestore={editLoState.loId ? () => handleRestore(editLoState.loId) : undefined}
+        isMarkedForDeletion={currentLoStatus === "to_delete"}
       />
       
       <ConfirmModal
