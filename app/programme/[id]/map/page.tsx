@@ -52,6 +52,30 @@ function MapPageContent() {
     return a.id.localeCompare(b.id);
   };
 
+  const compareLearningOutcomesStable = (
+    a: { loNumber?: string; text: string; id: string; category?: string },
+    b: { loNumber?: string; text: string; id: string; category?: string },
+  ) => {
+    const hasANumber = !!a.loNumber;
+    const hasBNumber = !!b.loNumber;
+    
+    if (hasANumber !== hasBNumber) {
+      return hasANumber ? -1 : 1;
+    }
+    
+    const loA = a.loNumber ?? "";
+    const loB = b.loNumber ?? "";
+    const loNumberDiff = loA.localeCompare(loB, undefined, { numeric: true, sensitivity: "base" });
+    if (loNumberDiff !== 0) return loNumberDiff;
+
+    const categoryDiff = (a.category ?? "").localeCompare(b.category ?? "", undefined, {
+      sensitivity: "base",
+    });
+    if (categoryDiff !== 0) return categoryDiff;
+
+    return a.id.localeCompare(b.id);
+  };
+
   const newLearningOutcomes = learningOutcomes.filter((learningOutcome) => learningOutcome.competencyId);
   const activeNewLearningOutcomes = newLearningOutcomes.filter(
     (learningOutcome) => learningOutcome.status !== "to_delete",
@@ -72,7 +96,7 @@ function MapPageContent() {
     outcomesByModule.set(learningOutcome.moduleId, [...list, learningOutcome]);
   });
   outcomesByModule.forEach((list, moduleId) => {
-    outcomesByModule.set(moduleId, [...list].sort(compareLearningOutcomes));
+    outcomesByModule.set(moduleId, [...list].sort(compareLearningOutcomesStable));
   });
 
   const handleEditLo = (loId: string, text: string, category?: string, competencyId?: string | null, status?: string) => {
@@ -183,65 +207,56 @@ function MapPageContent() {
                                   {(outcomesByModule.get(module.id) ?? []).filter((learningOutcome) => learningOutcome.status !== "to_delete").length} LOs
                                 </span>
                               </div>
-                              <div className="mt-3 grid gap-4 lg:grid-cols-2">
+                              <div className="mt-3 space-y-1">
                                 {(outcomesByModule.get(module.id) ?? []).map((learningOutcome) => {
                                   const isMarkedForDeletion = learningOutcome.status === "to_delete";
                                   const competency = frameworkCompetencies.find((record) => record.id === learningOutcome.competencyId);
                                   const competencyDescription = competency?.levels?.understand || competency?.levels?.apply || competency?.levels?.create || "";
                   
+                                  const hasBorder = isMarkedForDeletion || learningOutcome.competencyId;
+  
                                   return (
-                                    <span
+                                    <div
                                       key={learningOutcome.id}
-                                      className={`text-xs rounded-xl border p-3 ${
+                                      className={`flex items-start gap-2 text-xs ${hasBorder ? "rounded-xl border p-3" : "py-1"} ${
                                         isMarkedForDeletion
                                           ? "border-amber-300 bg-amber-50"
                                           : learningOutcome.competencyId
-                                            ? "border-green-500 bg-green-50"
-                                            : "border-slate-200 text-blue-700"
+                                            ? "border-green-500 bg-green-50 mb-2"
+                                            : ""
                                       }`}
                                     >
-                                      <div className="flex items-start justify-between gap-2">
-                                        <div className="flex flex-col gap-2">
-                                          {competency && (
-                                            <span
-                                              className="relative inline-block"
-                                            >
-                                              <span
-                                                className="inline-block rounded-full bg-blue-100 px-2 py-1 text-xs font-semibold text-blue-700 whitespace-nowrap"
-                                              >
-                                                {competency.id}
-                                              </span>
-                                              <span
-                                                className="tooltip-text"
-                                              >
-                                                {competency.title}: {competencyDescription.slice(0, 500)}{competencyDescription.length > 500 ? "..." : ""}
-                                              </span>
-                                            </span>
-                                          )}
-                                          {learningOutcome.category && <span className="inline-block rounded-full bg-slate-200 px-2 py-1 text-xs font-semibold text-slate-700 whitespace-nowrap">{learningOutcome.category}</span>}
-                                          <p className="mt-1 text-xs text-slate-700">{learningOutcome.text}</p>
-                                        </div>
-                                        {!isViewer && (
-                                          <button
-                                            type="button"
-                                            className="text-slate-400 hover:text-slate-600"
-                                            onClick={() => handleEditLo(learningOutcome.id, learningOutcome.text, learningOutcome.category, learningOutcome.competencyId, learningOutcome.status)}
-                                            aria-label="Edit"
-                                          >
-                                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="size-6">
+                                      {!isViewer && (
+                                        <button
+                                          type="button"
+                                          className="text-slate-400 hover:text-slate-600"
+                                          onClick={() => handleEditLo(learningOutcome.id, learningOutcome.text, learningOutcome.category, learningOutcome.competencyId, learningOutcome.status)}
+                                          aria-label="Edit"
+                                        >
+                                          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="size-5">
   <path strokeLinecap="round" strokeLinejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0 1 15.75 21H5.25A2.25 2.25 0 0 1 3 18.75V8.25A2.25 2.25 0 0 1 5.25 6H10" />
 </svg>
-                                          </button>
-                                        )}
-                                      </div>
-                                      {isMarkedForDeletion ? (
-                                        <div className="mt-2 flex flex-wrap gap-2">
-                                          <span className="rounded-full bg-amber-200 inline-block px-2 py-1 m-0 text-xs font-semibold text-amber-800">
-                                            For deletion
+                                        </button>
+                                      )}
+                                      <div className="flex-1 flex gap-2">
+                                        {competency && (
+                                          <span className="relative inline-block">
+                                            <span className="inline-block rounded-full bg-blue-100 px-2 py-1 text-xs font-semibold text-blue-700 whitespace-nowrap">
+                                              {competency.id}
+                                            </span>
+                                            <span className="tooltip-text">
+                                              {competency.title}: {competencyDescription.slice(0, 500)}{competencyDescription.length > 500 ? "..." : ""}
+                                            </span>
                                           </span>
-                                        </div>
-                                      ) : null}
-                                    </span>
+                                        )}
+                                        <p className={`text-slate-700 inline-block ${competency ? "" : "pt-1"}`}>{learningOutcome.text}</p>
+                                      </div>
+                                      {isMarkedForDeletion && (
+                                        <span className="rounded-full bg-amber-200 inline-block px-2 py-1 text-xs font-semibold text-amber-800">
+                                          For deletion
+                                        </span>
+                                      )}
+                                    </div>
                                   );
                                 })}
                               </div>
@@ -373,7 +388,7 @@ function MapPageContent() {
           {newLearningOutcomes.length === 0 ? (
             <p className="text-sm text-slate-500">No learning outcomes yet.</p>
           ) : (
-            [...newLearningOutcomes].sort(compareLearningOutcomes).map((learningOutcome) => {
+            [...newLearningOutcomes].sort(compareLearningOutcomesStable).map((learningOutcome) => {
               const competency = frameworkCompetencies.find((record) => record.id === learningOutcome.competencyId);
               const competencyDescription = competency?.levels?.understand || competency?.levels?.apply || competency?.levels?.create || "";
 
