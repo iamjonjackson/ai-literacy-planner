@@ -301,7 +301,7 @@ function AssessPageContent() {
                                     >
                                       {!assessment.rag ? "Missing AI taxonomy" : assessment.rag}
                                     </span>
-                                    {assessment.ragPlanned && assessment.ragPlanned !== "" && (
+                                    {assessment.ragPlanned !== null && assessment.ragPlanned !== "" && (
                                       <span
                                         className={`rounded-full px-2 py-1 text-xs font-semibold border-2 ${
                                           assessment.ragPlanned === "Red"

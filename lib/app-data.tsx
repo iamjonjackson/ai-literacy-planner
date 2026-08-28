@@ -1960,6 +1960,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
         weight?: string;
         duration?: string;
         rag: RagStatus;
+        ragPlanned?: RagStatus | null;
         priority?: PriorityRating | null;
       },
     ) => {
