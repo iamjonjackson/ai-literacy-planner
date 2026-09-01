@@ -144,8 +144,7 @@ function PlanPageContent() {
       state.learningOutcomes.filter(
         (learningOutcome) =>
           learningOutcome.programmeId === programmeId &&
-          learningOutcome.moduleId === null &&
-          learningOutcome.competencyId === null,
+          learningOutcome.moduleId === null,
       ),
     [programmeId, state.learningOutcomes],
   );
