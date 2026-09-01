@@ -1716,7 +1716,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
       const remainingModuleIds = new Set(modules.map((module) => module.id));
       const learningOutcomes = current.learningOutcomes.map((learningOutcome) =>
         learningOutcome.moduleId && !remainingModuleIds.has(learningOutcome.moduleId)
-          ? { ...learningOutcome, moduleId: null }
+          ? { ...learningOutcome, moduleId: null, wasUnmapped: true }
           : learningOutcome,
       );
       const assessments = current.assessments.filter((assessment) =>
