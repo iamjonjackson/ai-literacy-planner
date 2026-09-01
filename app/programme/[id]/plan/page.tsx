@@ -144,7 +144,8 @@ function PlanPageContent() {
       state.learningOutcomes.filter(
         (learningOutcome) =>
           learningOutcome.programmeId === programmeId &&
-          learningOutcome.moduleId === null,
+          learningOutcome.moduleId === null &&
+          !learningOutcome.wasUnmapped,
       ),
     [programmeId, state.learningOutcomes],
   );

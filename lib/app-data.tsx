@@ -65,6 +65,7 @@ type LearningOutcome = {
   category?: string;
   loNumber?: string;
   status?: "to_delete";
+  wasUnmapped?: boolean;
   updatedAt: string;
 };
 
@@ -342,7 +343,7 @@ function deleteModulesFromState(
       modules: state.modules.filter((module) => !deletableIds.has(module.id)),
       learningOutcomes: state.learningOutcomes.map((learningOutcome) =>
         learningOutcome.moduleId && deletableIds.has(learningOutcome.moduleId)
-          ? { ...learningOutcome, moduleId: null }
+          ? { ...learningOutcome, moduleId: null, wasUnmapped: true }
           : learningOutcome,
       ),
       assessments: state.assessments.filter((assessment) => !deletableIds.has(assessment.moduleId)),
