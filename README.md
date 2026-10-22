@@ -86,6 +86,26 @@ npm run dev
 - To force protection even when Supabase is missing, set:
 	- `NEXT_PUBLIC_REQUIRE_AUTH=true`
 
+## Keep-alive (Supabase free tier)
+
+The app exposes a public endpoint at `/api/keep-alive`. It runs a lightweight
+read-only query against Supabase (`SELECT id FROM programmes LIMIT 1`) so both
+the hosting platform and the Supabase project count as active.
+
+- Ping it manually any time: `curl https://your-deployed-app/api/keep-alive`
+- Daily automation is configured in
+  [.github/workflows/keep-alive.yml](.github/workflows/keep-alive.yml), which
+  runs every day at 06:17 UTC (and can be triggered manually via
+  "Run workflow").
+- To enable the scheduled ping, add a repository variable named `APP_URL` with
+  your deployed site URL (Settings → Secrets and variables → Actions →
+  Variables), e.g. `https://ai-literacy-planner.vercel.app`.
+- If `APP_URL` is not set, the workflow skips the ping with a warning.
+
+The endpoint is safe to call publicly: it exposes no data and performs no
+writes. A 2xx response means the database is reachable; `503` means Supabase
+env vars are missing on the server; `502` means the database query failed.
+
 ## Validation
 
 ```bash
