@@ -1,0 +1,39 @@
+name: Keep alive
+
+# Pings the deployed app once a day so the hosting platform and the Supabase
+# free-tier project stay active and are not paused for inactivity.
+# Requires a repository variable named APP_URL set to the deployed site URL,
+# e.g. https://ai-literacy-planner.vercel.app
+# (Settings > Secrets and variables > Actions > Variables)
+
+on:
+  schedule:
+    - cron: "17 6 * * *"
+  workflow_dispatch:
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check APP_URL is configured
+        id: check
+        run: |
+          if [ -z "${{ vars.APP_URL }}" ]; then
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::APP_URL repository variable is not set; skipping keep-alive ping."
+          else
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Ping keep-alive endpoint
+        if: steps.check.outputs.configured == 'true'
+        run: |
+          response=$(curl -sS -w "\n%{http_code}" --max-time 30 "${{ vars.APP_URL }}/api/keep-alive")
+          body=$(echo "$response" | head -n -1)
+          status=$(echo "$response" | tail -n 1)
+          echo "HTTP $status"
+          echo "$body"
+          if [ "$status" -lt 200 ] || [ "$status" -ge 300 ]; then
+            echo "::error::Keep-alive ping failed with HTTP $status"
+            exit 1
+          fi
